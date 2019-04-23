@@ -97,6 +97,13 @@ for(kpops in 1:length(grep(".Q", list.files("data/ADMIXTURE_LD8/BEST_K/"), value
           plot.background=element_blank(),
           plot.margin = unit(c(0,0,0,0), units = "cm"))
   
+  
+  
+  ggsave(admix_plots[[kpops]]  +
+           theme(axis.text.x=element_text(angle = 90)), filename = glue::glue("plots/SuppFigureXX_K{K}_LD8_names.pdf"), height = 4, width = 28)
+  ggsave(admix_plots[[kpops]]  +
+           theme(axis.text.x=element_text(angle = 90)), filename = glue::glue("plots/SuppFigureXX_K{K}_LD8_names.pdf"), height = 4, width = 28,dpi=300)
+  
   # extract representative strains from each ancesteral population for generating neighbor-net
   if(!exists("representative_K_strains")){
     representative_K_strains <- dplyr::filter(plot_order, frac_cluster > 0.999, !samples %in% names(strain_islands)) %>%
