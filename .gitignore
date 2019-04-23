@@ -1,2 +1,1 @@
-data/ANNOTATE_VCF/Ce330_annotated.vcf.gz
-data/ANNOTATE_VCF/Ce330_annotated.vcf.gz.tbi
+data/ANNOTATE_VCF/*.vcf.gz*
