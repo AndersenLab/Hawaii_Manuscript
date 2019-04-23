@@ -66,7 +66,7 @@ ggsave("plots/haplotype.pdf", height = 8, width = 12)
 K = 7
 
 # define outgroup
-outgroup_strain <- "XZ1516"
+outgroup_strain <- "ECA191"
 
 sample_names <- sort(data.table::fread("data/ANNOTATE_VCF/samples.txt", header = F) %>% dplyr::pull(V1))
 
