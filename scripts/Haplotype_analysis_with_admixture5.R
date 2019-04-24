@@ -47,67 +47,70 @@ admix <- data.table::fread("data/ADMIXTURE_LD8/BEST_K/K7_Processed_Ancestry.tsv"
 #####################################################################
 #load haplotypesfrom 276 strain set
 #load("~/Dropbox/AndersenLab/Hawaii_manuscript/data/HAPLOTYPE/haplotype_plot_df.Rda")
-load("data/HAPLOTYPE/processed_haps_LD8.Rda")
+# load("data/HAPLOTYPE/processed_haps.Rda")
+# 
+# # code for coloring haplotypes
+# color_plotpoint <- processed_haps[[5]] %>%
+#   dplyr::mutate(cvalue = row_number()) %>%
+#   dplyr::rename(color = value)
+# 
+# hap_df <-
+#   processed_haps[[3]] %>%
+#   dplyr::rename(isotype=haplotype,
+#                 haplotype=value) %>%
+#   dplyr::group_by(chromosome, isotype) %>%
+#   dplyr::arrange(chromosome, isotype, start, stop) %>%
+#   # Condense data structure
+#   mutate(segment = data.table::rleid(haplotype)) %>%
+#   dplyr::group_by(chromosome, isotype, segment) %>%
+#   dplyr::mutate(start = min(start), stop = max(stop)) %>%
+#   dplyr::distinct() %>%
+#   dplyr::mutate(cvalue = as.integer(haplotype),
+#                 hap_length = stop - start,
+#                 haplotype=as.character(haplotype)) %>%
+#   dplyr::select(chromosome, start, stop, haplotype, isotype, dplyr::everything()) %>%
+#   dplyr::left_join(color_plotpoint, by = c("cvalue")) %>%
+#   # Filter empty haplotypes
+#   dplyr::filter(!is.na(haplotype)) %>%
+#   # Determine the swept haplotype based on max(summation of lengths)
+#   dplyr::group_by(chromosome, haplotype) %>%
+#   dplyr::mutate(chrom_haplotype_sum = sum(hap_length)) %>%
+#   dplyr::group_by(chromosome) %>%
+#   dplyr::mutate(swept_haplotype = max(chrom_haplotype_sum) == chrom_haplotype_sum) %>%
+#   dplyr::mutate(swept_haplotype_name = ifelse(swept_haplotype, haplotype, NA),
+#                 swept_haplotype_name = base::Filter(Negate(is.na), unique(swept_haplotype_name)),
+#                 isotype_has_swept_haplotype = sum(swept_haplotype_name == haplotype) > 0,
+#                 isotypes_w_haplotype = length(unique(isotype))) %>%
+#   # Determine max length of swept haplotype and % shared
+#   dplyr::group_by(chromosome, haplotype, isotype) %>%
+#   dplyr::mutate(isotype_swept_haplotype_length = sum(ifelse(swept_haplotype, hap_length, 0))) %>%
+#   dplyr::group_by(chromosome, isotype) %>%
+#   dplyr::mutate(isotype_swept_haplotype_length = max(isotype_swept_haplotype_length)) %>%
+#   dplyr::group_by(chromosome) %>%
+#   dplyr::mutate(max_swept_haplotype_length = max(isotype_swept_haplotype_length)) %>%
+#   dplyr::group_by(chromosome, isotype) %>%
+#   dplyr::mutate(max_haplotype_shared = isotype_swept_haplotype_length / max_swept_haplotype_length) %>%
+#   dplyr::mutate(filtered_swept_haplotype_len = ifelse(
+#     (
+#       (hap_length > 1E6)
+#       &
+#         (max_haplotype_shared > 0.03)
+#       &
+#         (swept_haplotype == TRUE)
+#     ), hap_length, 0)
+#   ) %>%
+#   dplyr::mutate(filtered_sweep_len = sum(filtered_swept_haplotype_len), 
+#                 filtered_sweep_ratio =  (sum(filtered_swept_haplotype_len) / max_swept_haplotype_length),
+#                 is_swept = (sum(filtered_swept_haplotype_len) / max_swept_haplotype_length) > 0.03) %>%
+#   dplyr::rowwise() %>%
+#   dplyr::mutate(swept_haplotype = ifelse(is_swept == F, F, swept_haplotype)) %>%
+#   dplyr::ungroup()
 
-# code for coloring haplotypes
-color_plotpoint <- processed_haps[[5]] %>%
-  dplyr::mutate(cvalue = row_number()) %>%
-  dplyr::rename(color = value)
-
-hap_df <-
-  processed_haps[[3]] %>%
-  dplyr::rename(isotype=haplotype,
-                haplotype=value) %>%
-  dplyr::group_by(chromosome, isotype) %>%
-  dplyr::arrange(chromosome, isotype, start, stop) %>%
-  # Condense data structure
-  mutate(segment = data.table::rleid(haplotype)) %>%
-  dplyr::group_by(chromosome, isotype, segment) %>%
-  dplyr::mutate(start = min(start), stop = max(stop)) %>%
-  dplyr::distinct() %>%
-  dplyr::mutate(cvalue = as.integer(haplotype),
-                hap_length = stop - start,
-                haplotype=as.character(haplotype)) %>%
-  dplyr::select(chromosome, start, stop, haplotype, isotype, dplyr::everything()) %>%
-  dplyr::left_join(color_plotpoint, by = c("cvalue")) %>%
-  # Filter empty haplotypes
-  dplyr::filter(!is.na(haplotype)) %>%
-  # Determine the swept haplotype based on max(summation of lengths)
-  dplyr::group_by(chromosome, haplotype) %>%
-  dplyr::mutate(chrom_haplotype_sum = sum(hap_length)) %>%
-  dplyr::group_by(chromosome) %>%
-  dplyr::mutate(swept_haplotype = max(chrom_haplotype_sum) == chrom_haplotype_sum) %>%
-  dplyr::mutate(swept_haplotype_name = ifelse(swept_haplotype, haplotype, NA),
-                swept_haplotype_name = base::Filter(Negate(is.na), unique(swept_haplotype_name)),
-                isotype_has_swept_haplotype = sum(swept_haplotype_name == haplotype) > 0,
-                isotypes_w_haplotype = length(unique(isotype))) %>%
-  # Determine max length of swept haplotype and % shared
-  dplyr::group_by(chromosome, haplotype, isotype) %>%
-  dplyr::mutate(isotype_swept_haplotype_length = sum(ifelse(swept_haplotype, hap_length, 0))) %>%
-  dplyr::group_by(chromosome, isotype) %>%
-  dplyr::mutate(isotype_swept_haplotype_length = max(isotype_swept_haplotype_length)) %>%
-  dplyr::group_by(chromosome) %>%
-  dplyr::mutate(max_swept_haplotype_length = max(isotype_swept_haplotype_length)) %>%
-  dplyr::group_by(chromosome, isotype) %>%
-  dplyr::mutate(max_haplotype_shared = isotype_swept_haplotype_length / max_swept_haplotype_length) %>%
-  dplyr::mutate(filtered_swept_haplotype_len = ifelse(
-    (
-      (hap_length > 1E6)
-      &
-        (max_haplotype_shared > 0.03)
-      &
-        (swept_haplotype == TRUE)
-    ), hap_length, 0)
-  ) %>%
-  dplyr::mutate(filtered_sweep_len = sum(filtered_swept_haplotype_len), 
-                filtered_sweep_ratio =  (sum(filtered_swept_haplotype_len) / max_swept_haplotype_length),
-                is_swept = (sum(filtered_swept_haplotype_len) / max_swept_haplotype_length) > 0.03) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(swept_haplotype = ifelse(is_swept == F, F, swept_haplotype)) %>%
-  dplyr::ungroup()
+# Load processed haps
+load("data/HAPLOTYPE_LD8/haplotype_plot_df.Rda")
 
 # join admixture info
-hap_admix_df <- dplyr::left_join(hap_df, admix)
+hap_admix_df <- dplyr::left_join(plot_df, admix)
 
 # Plot % sharing of max haplotype between global admix population D and Hawaiian poulations C, F, G. No filtering of sweep.
 admix_sharing_all <- hap_admix_df  %>% 

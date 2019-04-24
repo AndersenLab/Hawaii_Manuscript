@@ -224,7 +224,7 @@ ggsave('plots/Figure1_maps.pdf', width = 12, height = 8.6)
 ggsave('plots/Figure1_maps.png', width = 12, height = 8.6)
 
 ####################################################
-#  Bar chart inset no multiples                    # 
+#  Bar chart inset                   # 
 ####################################################
 # Plot stacked bar chart
 bar_chart <- plot_spp_ids %>%
@@ -264,140 +264,11 @@ plot_bar_chart_legend <- cowplot::plot_grid(cowplot::get_legend(plot_bar_chart))
 ggsave('plots/Figure1_barchat_insert_legend.pdf', width = 3, height = 3)
 ggsave('plots/Figure1_barchat_insert_legend.png', width = 3, height = 3)
 
-
-####################################################
-#  Bar chart inset with multiples                  # 
-####################################################
-# Identify multiples for plotting
-collection_multiples <- cso %>%
-  dplyr::mutate(collection_type = ifelse(worms_on_sample %in% c("No","?"), "No Nematode",
-                                         ifelse(is.na(spp_id), "Not genotyped",
-                                                ifelse(pcr_rhpositive == 0, "PCR -",
-                                                       ifelse(spp_id %in% c("Chabertia ovina",
-                                                                            "Choriorhabditis cristata",
-                                                                            "Choriorhabditis sp.",
-                                                                            "Heterhabditis zealandica",
-                                                                            "Mesorhabditis sp.",
-                                                                            "no match",
-                                                                            "C. kamaaina",
-                                                                            "Rhabditis terricola",
-                                                                            "Rhanditis tericola",
-                                                                            "Teratorhabditis sp.",
-                                                                            "Unknown",
-                                                                            "unknown",
-                                                                            "Oscheius sp.",
-                                                                            "Panagrolaimus sp.",
-                                                                            NA),
-                                                              "Other PCR +", spp_id))))) %>%
-  dplyr::select(c_label, collection_type, island, spp_id, pcr_rhpositive, worms_on_sample) %>%
-  dplyr::distinct(c_label, collection_type, .keep_all=T) %>% 
-  dplyr::group_by(c_label) %>%
-  dplyr::mutate(plot_type = ifelse(n() > 1, "multiple", collection_type)) %>%
-  dplyr::filter(plot_type == "multiple") %>%
-  dplyr::arrange(collection_type) %>%
-  dplyr::select(island,  c_label, spp_id, collection_type, plot_type) %>%
-  dplyr::group_by(c_label) %>%
-  dplyr::mutate(collection_type_label = paste0(collection_type, collapse = ", "),
-                collection_type_num = n(),
-                spp_id_label = paste0(spp_id, collapse = ", "),
-                spp_id_num = n()) %>%
-  dplyr::distinct(c_label, .keep_all = T) %>%
-  dplyr::arrange(island, collection_type_label) %>%
-  dplyr::select(island, c_label,  collection_type_label, collection_type_num, spp_id_label, spp_id_num)
-
-# Plot stacked bar chart
-bar_chart_m <- cso %>%
-  dplyr::mutate(collection_class = ifelse(worms_on_sample %in% c("No","?"), "No Nematode",
-                                         ifelse(is.na(spp_id), "Not genotyped",
-                                                ifelse(pcr_rhpositive == 0, "PCR -",
-                                                       ifelse(spp_id %in% c("Chabertia ovina",
-                                                                            "Choriorhabditis cristata",
-                                                                            "Choriorhabditis sp.",
-                                                                            "Heterhabditis zealandica",
-                                                                            "Mesorhabditis sp.",
-                                                                            "no match",
-                                                                            "C. kamaaina",
-                                                                            "Rhabditis terricola",
-                                                                            "Rhanditis tericola",
-                                                                            "Teratorhabditis sp.",
-                                                                            "Unknown",
-                                                                            "unknown",
-                                                                            "Oscheius sp.",
-                                                                            "Panagrolaimus sp.",
-                                                                            NA),
-                                                              "Other PCR +", spp_id))))) %>%
-  dplyr::select(c_label, collection_class, island, spp_id, pcr_rhpositive, worms_on_sample) %>%
-  dplyr::distinct(c_label, collection_class, .keep_all=T) %>% 
-  dplyr::group_by(c_label) %>%
-  dplyr::mutate(plot_class = ifelse(n() > 1, "multiple", collection_class)) %>%
-  dplyr::ungroup() %>%
-  dplyr::distinct(c_label, .keep_all = T) %>%
-  dplyr::group_by(plot_class, island) %>%
-  dplyr::mutate(collections_per_island = n()) %>%
-  dplyr::ungroup() %>%
-  dplyr::group_by(island) %>%
-  dplyr::mutate(total_collections = n(), perc_class_island = collections_per_island / total_collections * 100) %>%
-  dplyr::arrange(total_collections) %>%
-  #dplyr::select(fixed_substrate, plot_class, total_substrates, perc_worm_sub, worm_per_substrate) %>%
-  dplyr::ungroup() %>%
-  dplyr::distinct(plot_class, island, .keep_all = T) %>%
-  dplyr::mutate(island = factor(island, levels = names(island_palette))) %>%
-  dplyr::mutate(plot_class = factor(plot_class, levels = c("multiple", "No Nematode", "Not genotyped", "PCR -", "Other PCR +", "C. briggsae", "C. tropicalis", "C. sp. 53", "C. elegans")))
-
-# Fig2B plot for rhabditida positive collections
-plot_bar_chart_m <- ggplot(data = bar_chart_m) +
-  geom_bar(stat = "identity", aes(x = factor(island), y = perc_class_island, fill = plot_class), colour = "black") +
-  scale_fill_manual(values=c(species_palette)) +
-  theme(axis.title = element_text(size = 8, color = "black"),
-        axis.text = element_text(size = 8, color = "black"),
-        legend.position = "blank") + 
-        #legend.text = element_text(size = 8, color = "black")) +
-  labs(fill = "", x = "", y = "Percentage of all collections") +
-  geom_text(aes(x=island, y=102, label=paste0("n=",total_collections)), 
-            position = position_dodge(width=1), size = 2.5) +
-  guides(fill = guide_legend(reverse = TRUE)) +
-  scale_y_continuous(breaks = c(25, 50, 75, 100), limits = c(0, 102))
-
-ggsave('plots/Figure1_barchat_insert_multiples.pdf', width = 3, height = 3)
-ggsave('plots/Figure1_barchat_insert_multiples.png', width = 3, height = 3)
-
-# Calculate numbers of isolates for each species
-isolate_counts <- cso %>%
-  dplyr::mutate(collection_class = ifelse(worms_on_sample %in% c("No","?"), "No Nematode",
-                                          ifelse(is.na(spp_id), "Not genotyped",
-                                                 ifelse(pcr_rhpositive == 0, "PCR -",
-                                                        ifelse(spp_id %in% c("Chabertia ovina",
-                                                                             "Choriorhabditis cristata",
-                                                                             "Choriorhabditis sp.",
-                                                                             "Heterhabditis zealandica",
-                                                                             "Mesorhabditis sp.",
-                                                                             "no match",
-                                                                             #"C. kamaaina",
-                                                                             "Rhabditis terricola",
-                                                                             "Rhanditis tericola",
-                                                                             "Teratorhabditis sp.",
-                                                                             "Unknown",
-                                                                             "unknown",
-                                                                             "Oscheius sp.",
-                                                                             "Panagrolaimus sp.",
-                                                                             NA),
-                                                               "Other PCR +", spp_id))))) %>%
-  dplyr::filter(!(collection_class %in% c("No Nematode","Not genotyped", "Other PCR +"))) %>%
-  dplyr::group_by(collection_class) %>%
-  dplyr::mutate(total_isolates = n())
-  dplyr::group_by(collection_class) %>%
-  dplyr::mutate(isolates_per_class = n()) %>%
-  dplyr::ungroup() %>%
-  dplyr::distinct(collection_class, .keep_all=T) %>%
-  dplyr::select(collection_class, isolates_per_class)
-
-
-### Dan script for generating tabels
-library(janitor)
-
 #=========================#
 # Generate Summary Tables #
 #=========================#
+### Dan script for generating tabels
+library(janitor)
 
 df %>%
   dplyr::select(isotype,
@@ -422,7 +293,7 @@ df %>%
                 substrate_moisture,
                 substrate_moisture_issue,
                 datetime,
-                date) %>% readr::write_tsv("table/collection_summary2.tsv")
+                date) %>% readr::write_tsv("table/collection_summary.tsv")
 
 
 #===================#
@@ -430,26 +301,26 @@ df %>%
 #===================#
 
 # Species by island - copied from 20180122-map-overview.R
-test <- cso %>%
+counts <- cso %>%
   dplyr::mutate(plot_type = ifelse(worms_on_sample %in% c("No","?"), "No Nematode",
-                                          ifelse(is.na(spp_id), "Not genotyped",
-                                                 ifelse(pcr_rhpositive == 0, "PCR -",
-                                                        ifelse(spp_id %in% c(#"Chabertia ovina",
-                                                                             #"Choriorhabditis cristata",
-                                                                             #"Choriorhabditis sp.",
-                                                                             #"Heterhabditis zealandica",
-                                                                             #"Mesorhabditis sp.",
-                                                                             "no match",
-                                                                             #"C. kamaaina",
-                                                                             #"Rhabditis terricola",
-                                                                             #"Rhanditis tericola",
-                                                                             #"Teratorhabditis sp.",
-                                                                             "Unknown",
-                                                                             "unknown",
-                                                                             #"Oscheius sp.",
-                                                                             #"Panagrolaimus sp.",
-                                                                             NA),
-                                                               "Other PCR +", spp_id))))) %>%
+                                   ifelse(is.na(spp_id), "Not genotyped",
+                                          ifelse(pcr_rhpositive == 0, "PCR -",
+                                                 ifelse(spp_id %in% c(#"Chabertia ovina",
+                                                   #"Choriorhabditis cristata",
+                                                   #"Choriorhabditis sp.",
+                                                   #"Heterhabditis zealandica",
+                                                   #"Mesorhabditis sp.",
+                                                   "no match",
+                                                   #"C. kamaaina",
+                                                   #"Rhabditis terricola",
+                                                   #"Rhanditis tericola",
+                                                   #"Teratorhabditis sp.",
+                                                   "Unknown",
+                                                   "unknown",
+                                                   #"Oscheius sp.",
+                                                   #"Panagrolaimus sp.",
+                                                   NA),
+                                                   "Other PCR +", spp_id))))) %>%
   dplyr::arrange(desc(plot_type)) %>%
   dplyr::arrange(desc(plot_type)) %>%
   dplyr::rename(species = plot_type) %>%
@@ -459,7 +330,95 @@ test <- cso %>%
   tidyr::spread(island, worm_isolates, fill=0) %>%
   janitor::adorn_totals('row') %>%
   janitor::adorn_totals('col') %>%
-  readr::write_tsv("table/species_identified_by_island2.tsv")
+  readr::write_tsv("table/species_identified_by_island.tsv")
+
+fractions <- counts %>%
+  dplyr::mutate(all_samples = 2263,
+                perc_total = (Total/all_samples)*100)
+
+# Island enrichment analysis
+# shape data for analysis for each Caenorhabditis species
+FE_isl_ce <- counts %>%
+  dplyr::filter(species == "C. elegans") %>%
+  tidyr::gather(island, count, -Total, -species) %>%
+  dplyr::select(island, ce = count) %>%
+  dplyr::mutate(isl_total = case_when(
+                                      island == "Big Island" ~ 701,
+                                      island == "Maui" ~ 466,
+                                      island == "Molokai" ~ 86,
+                                      island == "Oahu" ~ 101,
+                                      island == "Kauai" ~ 909),
+                no_ce = isl_total-ce) %>%
+  dplyr::select(island, no_ce, ce) %>%
+  column_to_rownames(var = "island") %>%
+  as.matrix(.)
+
+FE_isl_cb <- counts %>%
+  dplyr::filter(species == "C. briggsae") %>%
+  tidyr::gather(island, count, -Total, -species) %>%
+  dplyr::select(island, cb = count) %>%
+  dplyr::mutate(isl_total = case_when(
+    island == "Big Island" ~ 701,
+    island == "Maui" ~ 466,
+    island == "Molokai" ~ 86,
+    island == "Oahu" ~ 101,
+    island == "Kauai" ~ 909),
+    no_cb = isl_total-cb) %>%
+  dplyr::select(island, no_cb, cb) %>%
+  column_to_rownames(var = "island") %>%
+  as.matrix(.)
+
+FE_isl_ct <- counts %>%
+  dplyr::filter(species == "C. tropicalis") %>%
+  tidyr::gather(island, count, -Total, -species) %>%
+  dplyr::select(island, ct = count) %>%
+  dplyr::mutate(isl_total = case_when(
+    island == "Big Island" ~ 701,
+    island == "Maui" ~ 466,
+    island == "Molokai" ~ 86,
+    island == "Oahu" ~ 101,
+    island == "Kauai" ~ 909),
+    no_ct = isl_total-ct) %>%
+  dplyr::select(island, no_ct, ct) %>%
+  column_to_rownames(var = "island") %>%
+  as.matrix(.)
+
+FE_isl_co <- counts %>%
+  dplyr::filter(species == "C. sp. 53") %>%
+  tidyr::gather(island, count, -Total, -species) %>%
+  dplyr::select(island, co = count) %>%
+  dplyr::mutate(isl_total = case_when(
+    island == "Big Island" ~ 701,
+    island == "Maui" ~ 466,
+    island == "Molokai" ~ 86,
+    island == "Oahu" ~ 101,
+    island == "Kauai" ~ 909),
+    no_co = isl_total-co) %>%
+  dplyr::select(island, no_co, co) %>%
+  column_to_rownames(var = "island") %>%
+  as.matrix(.)
+
+# Post-hoc pairwise Fisher tests with pairwise.table
+pairwiseNominalIndependence(FE_isl_ce,
+                            fisher = TRUE,
+                            gtest  = FALSE,
+                            chisq  = FALSE,
+                            method = "bonferroni", simulate.p.value = TRUE)
+pairwiseNominalIndependence(FE_isl_cb,
+                            fisher = TRUE,
+                            gtest  = FALSE,
+                            chisq  = FALSE,
+                            method = "bonferroni", simulate.p.value = TRUE)
+pairwiseNominalIndependence(FE_isl_ct,
+                            fisher = TRUE,
+                            gtest  = FALSE,
+                            chisq  = FALSE,
+                            method = "bonferroni", simulate.p.value = TRUE)
+pairwiseNominalIndependence(FE_isl_co,
+                            fisher = TRUE,
+                            gtest  = FALSE,
+                            chisq  = FALSE,
+                            method = "bonferroni", simulate.p.value = TRUE)
 
 
 #==================================#
