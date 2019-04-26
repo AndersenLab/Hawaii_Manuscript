@@ -171,7 +171,6 @@ if(!file.exists("data/fulcrum/HW_isotype_collection_parameters_processed.tsv")){
 df <- data.table::fread("data/WI_strain_list.csv")
 
 
-
 # generate K summary plot - Supplemental figure XX
 admixture_panel <- list()
 for(kpops in 1:length(grep(".Q", list.files("data/ADMIXTURE_LD8/BEST_K/"), value = T))){
@@ -414,7 +413,11 @@ ass_stats <- left_join(hm_hi5, cso %>% dplyr::filter(!is.na(isotype)) %>% dplyr:
   dplyr::distinct(c_label, isotype, .keep_all = TRUE) # could filter distinct gridsect to reduce effect of over sampling at those locations
 
 # join admix and ass_stats
-ass_stats <- left_join(ass_stats, admix) 
+ass_stats <- left_join(ass_stats, admix) %>%
+  group_by(c_label) %>%
+  dplyr::mutate(c_label2 = as.character(ifelse(is.na(c_label), row_number(), c_label))) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(c_label = c_label2) 
 
 # filter for continuous variables with only one sample for each 
 ass_stats_cont <- ass_stats %>%
@@ -460,21 +463,87 @@ for (e in 1:length(unique(ass_stats_cont$env_par))){
   
 Dunn_list
 
+# box plots showing with test from above
+ggplot(ass_stats_cont %>% tidyr::spread(env_par, value)) +
+  aes(x = sub_pop, y = altitude) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(wdith = 0.25, alpha = 0.5, shape = 21)
+
 # do it again but with samples restricted to one representative admix population per gridsect 
 #perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
 options(scipen=999)
-Dunn_list <- list()
+Dunn_list_filtered <- list()
 
 for (e in 1:length(unique(ass_stats_cont_small$env_par))){
   KM_df <- ass_stats_cont_small %>%
     dplyr::filter(env_par == (unique(ass_stats_cont_small$env_par)[e]))
   
   D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop, method = "bonferroni") 
-  Dunn_list[[unique(ass_stats_cont_small$env_par)[e]]] <- D_test
+  Dunn_list_filtered[[unique(ass_stats_cont_small$env_par)[e]]] <- D_test
 }
 
-Dunn_list
+Dunn_list_filtered
 
+# box plots showing with test from above K=7 global
+altitude_small <- ggplot(ass_stats_cont_small %>% tidyr::spread(env_par, value)) +
+  aes(x = sub_pop, y = altitude) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(wdith = 0.25, alpha = 0.5) +
+  theme_bw()
+altitude_small
+
+sub_temp_small <- ggplot(ass_stats_cont_small %>% tidyr::spread(env_par, value)) +
+  aes(x = sub_pop, y = substrate_temperature) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(wdith = 0.25, alpha = 0.5) +
+  theme_bw()
+sub_temp_small
+
+k7_box_plots <- cowplot::plot_grid(altitude_small, sub_temp_small)
+k7_box_plots
+ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_filtered.pdf', width = 7.5, height = 7.5)
+
+##############
+############## same as above but with populations F and G grouped as non-admixed populations
+# do it again but with samples restricted to one representative admix population per gridsect 
+#perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
+ass_stats_cont_small_grouped <- ass_stats_cont_small %>%
+  dplyr::mutate(sub_pop2 = ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed"))
+  
+
+options(scipen=999)
+Dunn_list_filtered_grouped <- list()
+
+for (e in 1:length(unique(ass_stats_cont_small_grouped$env_par))){
+  KM_df <- ass_stats_cont_small_grouped %>%
+    dplyr::filter(env_par == (unique(ass_stats_cont_small_grouped$env_par)[e]))
+  
+  D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop2, method = "bonferroni") 
+  Dunn_list_filtered_grouped[[unique(ass_stats_cont_small_grouped$env_par)[e]]] <- D_test
+}
+
+Dunn_list_filtered_grouped
+
+# box plots showing with test from above K=7 global with grouped F and G
+altitude_small_grouped <- ggplot(ass_stats_cont_small_grouped %>% tidyr::spread(env_par, value)) +
+  aes(x = sub_pop2, y = altitude) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.25, alpha = 0.5) +
+  theme_bw()
+altitude_small_grouped
+
+sub_temp_small_grouped <- ggplot(ass_stats_cont_small_grouped %>% tidyr::spread(env_par, value)) +
+  aes(x = sub_pop2, y = substrate_temperature) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.25, alpha = 0.5) +
+  theme_bw()
+sub_temp_small_grouped
+
+k7_box_plots <- cowplot::plot_grid(altitude_small_grouped, sub_temp_small_grouped)
+k7_box_plots
+ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_filtered_GFgrouped.pdf', width = 7.5, height = 7.5)
+
+###############################################
 # do fisher exact test for substrate enrichment 
 ass_sub<- ass_stats %>%
   dplyr::distinct(isotype, grid_num, fixed_substrate, .keep_all = T) %>%
@@ -518,10 +587,12 @@ ass_sub<- ass_stats %>%
   dplyr::group_by(island) %>%
   dplyr::mutate(tot_sub_num = n()) %>%
   dplyr::mutate(c = ifelse(pop_assignment == "C", 1, NA),
-                f = ifelse(pop_assignment == "F", 1, NA)) %>%
+                f = ifelse(pop_assignment == "F", 1, NA),
+                g = ifelse(pop_assignment == "G", 1, NA)) %>%
   dplyr::group_by(island, pop_assignment) %>%
   dplyr::mutate(c = na.pass(sum(c)),
-                f = na.pass(sum(f))) %>%
+                f = na.pass(sum(f)),
+                g = na.pass(sum(g))) %>%
   dplyr::ungroup()
 
 ass_i_f <- ass_sub %>%
@@ -542,6 +613,15 @@ ass_i_c <- ass_sub %>%
   column_to_rownames(var = "island") %>%
   as.matrix(.)
 
+ass_i_g <- ass_sub %>%
+  dplyr::filter(pop_assignment == "G") %>%
+  dplyr::mutate(no_g = tot_sub_num-g,
+                g = g) %>%
+  dplyr::select(island, no_g, g) %>%
+  dplyr::distinct(island, .keep_all=TRUE) %>%
+  column_to_rownames(var = "island") %>%
+  as.matrix(.)
+
 # full chi squared test to see if there are differernces 
 chisq.test(ass_i_f, simulate.p.value = TRUE)
 
@@ -553,4 +633,7 @@ pairwiseNominalIndependence(ass_i_f,
 
 # full chi squared test to see if there are differernces 
 chisq.test(ass_i_c, simulate.p.value = TRUE)
+
+# full chi squared test to see if there are differernces. not needed for G b/c only found on BIg Island
+#chisq.test(ass_i_g, simulate.p.value = TRUE)
 
