@@ -186,6 +186,10 @@ env_par_ggpairs_plot <- ggpairs(env_corr,  mapping = aes(color = spp_id, alpha =
 ggsave(filename="plots/env_par_ggpairs.pdf", plot = env_par_ggpairs_plot, height = 170, width = 170, units = "mm")
 ggsave(filename="plots/env_par_ggpairs.png", plot = env_par_ggpairs_plot, height = 170, width = 170, units = "mm")
 
+# mean temps for species
+par_means <- stat_df %>%
+  dplyr::group_by(env_par, species_family) %>%
+  dplyr::mutate(means = mean(value))
 
 
 
