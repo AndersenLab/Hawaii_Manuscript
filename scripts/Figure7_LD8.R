@@ -23,6 +23,10 @@ ancestry.colours <- c("A"="gold2", "B"="plum4","C"= "darkorange1",
                       "L"="mediumpurple4","M"= "orange","N"= "maroon","O"= "yellow3","P"= "brown4", 
                       "Q"="yellow4", "R"="sienna4", "S"="chocolate", "T"="gray19")
 
+# pie_chart define a color pallette with maximal contrast
+ancestry.colours.pie <- c("perc_a"="gold2", "perc_b"="plum4","perc_c"= "darkorange1", 
+                      "perc_d"="lightskyblue2", "perc_e"="firebrick","perc_f"= "burlywood3", "perc_g"="gray51")
+
 
 # generate sample list
 # vcf name says 330, but it is a lie
@@ -175,9 +179,57 @@ write.table(representative_K_strains,
             sep = "\t")
 
 
-
-
-
+# make admixture pie charts for figure7 with K=7, sum admix poroportions and divide by total number
+# load processed ancestry
+pop_perc <- data.table::fread("data/ADMIXTURE_LD8/BEST_K/K7_Processed_Ancestry.tsv") %>%
+tidyr::gather(cluster, frac_cluster, -samples) %>%
+  dplyr::group_by(samples) %>%
+  dplyr::mutate(max_frac = max(frac_cluster)) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(cluster, max_frac) %>%
+  dplyr::mutate(samples = factor(samples, levels = unique(samples))) %>%
+  dplyr::mutate(pop_assignment = ifelse(max_frac == frac_cluster, cluster, NA)) %>%
+  dplyr::group_by(samples) %>%
+  tidyr::fill(pop_assignment, .direction = "down") %>%
+  tidyr::fill(pop_assignment, .direction = "up") %>%
+  dplyr::ungroup() %>%
+  tidyr::spread(cluster, frac_cluster) %>%
+  dplyr::group_by(pop_assignment) %>%
+  dplyr::mutate(perc_a = sum(A)/n()*100,
+                perc_b = sum(B)/n()*100,
+                perc_c = sum(C)/n()*100,
+                perc_d = sum(D)/n()*100,
+                perc_e = sum(E)/n()*100,
+                perc_f = sum(F)/n()*100,
+                perc_g = sum(G)/n()*100,
+                n = n())%>%
+  dplyr::ungroup() %>%
+  dplyr::distinct(pop_assignment, perc_a, perc_b, perc_c, perc_d, perc_e, perc_f, perc_g, n) %>%
+  dplyr::group_by(pop_assignment) %>%
+  dplyr::mutate(total_perc = sum(perc_a, perc_b, perc_c, perc_d, perc_e, perc_f, perc_g)) %>%
+  tidyr::gather(cluster, cluster_perc, - pop_assignment, -n, -total_perc) %>%
+  dplyr::mutate(cluster = factor(cluster, levels = c("perc_a", "perc_b", "perc_d", "perc_e", "perc_c", "perc_f", "perc_g"))) %>%
+  dplyr::arrange(pop_assignment, cluster)
+  
+pop_assignment_pie_chart <- ggplot(pop_perc, aes(x="", y=cluster_perc, fill=cluster))+
+  geom_bar(width = 1, stat = "identity") +
+  facet_wrap(~pop_assignment) +
+  coord_polar("y", start=0) +
+  labs(y = "", x = "", fill = "") +
+  scale_fill_manual(values = ancestry.colours.pie) +
+  theme_minimal()+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.border = element_blank(),
+    panel.grid=element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x=element_blank())
+  #geom_text(aes(x=1, y = value, label=ifelse(group == "fraction_hi", num_hi_isotypes_in_pop, num_isotypes_in_pop-num_hi_isotypes_in_pop)))
+pop_assignment_pie_chart
+              
+ggsave(paste("plots/ADMIXTURE_pie_charts_LD8_K=7.png"), width = 5, height = 5)
+ggsave(paste("plots/ADMIXTURE_pie_charts_LD8_K=7.pdf"), width = 5, height = 5)
 
 
 
