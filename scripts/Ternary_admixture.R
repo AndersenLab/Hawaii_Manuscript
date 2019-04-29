@@ -47,7 +47,7 @@ A <-  ggtern(data=plotFG,aes(F,D,G,fill=pop_assignment)) +
 A
 
 ggsave(paste("plots/Ternary_FDG_K=7_LD8_HI.png"), width = 3.75, height = 3.75)
-ggsave(paste("plots/Ternary_FDG__K=7_LD8_HI.pdf"), width = 3.75, height = 3.75)
+ggsave(paste("plots/Ternary_FDG__K=7_LD8_HI.pdf"), width = 3.75, height = 3.75, useDingbats=FALSE)
 
   
 plotF <- admix %>%
@@ -67,7 +67,7 @@ B <- ggtern(data=plotF,aes(F,D,C,fill=pop_assignment)) +
 B
 
 ggsave(paste("plots/Ternary_FDC_K=7_LD8_HI.png"), width = 3.75, height = 3.75)
-ggsave(paste("plots/Ternary_FDC__K=7_LD8_HI.pdf"), width = 3.75, height = 3.75)
+ggsave(paste("plots/Ternary_FDC__K=7_LD8_HI.pdf"), width = 3.75, height = 3.75, useDingbats=FALSE)
 
 plotG <- admix %>%
   # dplyr::group_by(isotype) %>%
@@ -86,5 +86,5 @@ C <- ggtern(data=plotG,aes(G,D,C,fill=pop_assignment)) +
 C
 
 ggsave(paste("plots/Ternary_GDC_K=7_LD8_HI.png"), width = 3.75, height = 3.75)
-ggsave(paste("plots/Ternary_GDC__K=7_LD8_HI.pdf"), width = 3.75, height = 3.75)
+ggsave(paste("plots/Ternary_GDC__K=7_LD8_HI.pdf"), width = 3.75, height = 3.75, useDingbats=FALSE)
 

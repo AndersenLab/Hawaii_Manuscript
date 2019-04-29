@@ -26,7 +26,7 @@ ancestry.colours <- c("A"="gold2", "B"="plum4","C"= "darkorange1",
 
 # generate sample list
 # vcf name says 330, but it is a lie
-system("bcftools query -l data/ANNOTATE_VCF/Ce330_annotated.vcf.gz > data/ANNOTATE_VCF/samples.txt")
+#system("bcftools query -l data/ANNOTATE_VCF/Ce330_annotated.vcf.gz > data/ANNOTATE_VCF/samples.txt")
 
 # strain names
 # get sample information
@@ -141,7 +141,7 @@ ksummary_plot <- cowplot::plot_grid(ksum_plot,
 admix_legend <- cowplot::plot_grid(cowplot::get_legend(admix_plots[[5]]))
 
 # save
-ggsave(ksummary_plot, filename = "plots/SuppFigureXX_KSummary_LD8.pdf", height = 8, width = 12)
+ggsave(ksummary_plot, filename = "plots/SuppFigureXX_KSummary_LD8.pdf", height = 8, width = 12, useDingbats=FALSE)
 ggsave(ksummary_plot, filename = "plots/SuppFigureXX_KSummary_LD8.png", height = 8, width = 12,dpi=300)
 # ggsave(final_plot, filename = "plots/Figure6_LD8.png", height = 10, width = 12, dpi = 300)
 # ggsave(admix_legend, filename = "plots/admix_legend_LD8.pdf", height = 8, width = 12)
@@ -168,7 +168,7 @@ for(apops in unique(representative_K_strains$K_size)){
 # load .nexus files into SplitsTree and output plot svg into plots folder
 
 write.table(representative_K_strains, 
-            file = "data/ADMIXTURE/BEST_K/Hawaiia_plus_RepStrains_by_K.tsv",
+            file = "data/ADMIXTURE_LD8/BEST_K/Hawaiia_plus_RepStrains_by_K.tsv",
             quote = F,
             col.names = T, 
             row.names = F, 

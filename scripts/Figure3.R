@@ -58,7 +58,7 @@ stat_df <- cso %>%
   dplyr::group_by(env_par) %>%
   dplyr::mutate(KM_pvalue = kruskal.test(value ~ species_family)[[3]])
 
-# perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method
+# Kruskal–Wallis test then multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method
 Dunn_list <- list()
 
 for (e in 1:length(unique(stat_df$env_par))){
