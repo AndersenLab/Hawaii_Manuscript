@@ -1,5 +1,10 @@
 library(tidyverse)
-load("data/HAPLOTYPE/haplotype_plot_df.Rda")
+
+# set working directory
+setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
+
+# load haplotype plot df
+load("data/HAPLOTYPE_LD8/haplotype_plot_df.Rda")
 
 get_group_number = function(){
   i = 0
@@ -55,9 +60,6 @@ pr_plot_df%>%
         strip.background.x = element_blank())
 
 ggsave("plots/haplotype.pdf", height = 8, width = 12)
-
-
-
 
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  Generate Population Summary File for TREEMIX  ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ #
