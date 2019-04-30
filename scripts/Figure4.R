@@ -277,34 +277,40 @@ cor_test_df <- cso %>%
                 approx_pop1 = as.numeric(approx_pop),
                 approx_pop2 = ifelse(approximate_number_of_worms == "Proliferating (25+)", 2,1))
 
+# setup test levels for cb and ct and do test inside of dataframe
+cor_test_df_cb_ct_test <- cor_test_df %>%
+  dplyr::filter(fixed_substrate %in% c("Flower", "Leaf litter")) %>%
+  dplyr::group_by(spp_id) %>%
+  dplyr::do(broom::tidy(cor.test(.$fixed_substrate1, .$approx_pop2, alternative = "g")))
+
+# test levels for cb and ct for flower vs leaf litter plot
 cor_test_df_cb_ct <- cor_test_df %>%
   dplyr::filter(fixed_substrate %in% c("Flower", "Leaf litter")) %>%
-  dplyr::group_by(spp_id) %>%
-  dplyr::do(broom::tidy(cor.test(.$fixed_substrate1, .$approx_pop2, alternative = "g")))
+  dplyr::group_by(spp_id)
 
-cor_test_df_co <- cor_test_df %>%
+# setup test levels for co and do test inside of dataframe
+cor_test_df_co_test <- cor_test_df %>%
   dplyr::mutate(fixed_substrate = factor(fixed_substrate, levels = c("Fruit/nut/veg", "Flower", "Leaf litter", "Fungus",  "Other")), # reorder for cor test between fruit and flower 
                 fixed_substrate1 = as.numeric(fixed_substrate)) %>%
-  dplyr::filter(fixed_substrate %in% c("Flower", "Leaf litter")) %>%
+  dplyr::filter(fixed_substrate %in% c("Fruit/nut/veg", "Flower"))%>%
   dplyr::group_by(spp_id) %>%
   dplyr::do(broom::tidy(cor.test(.$fixed_substrate1, .$approx_pop2, alternative = "g")))
 
+# test levels for co for flower vs Fruit plot
+  cor_test_df_co <- cor_test_df %>%
+    dplyr::mutate(fixed_substrate = factor(fixed_substrate, levels = c("Fruit/nut/veg", "Flower", "Leaf litter", "Fungus",  "Other")), # reorder for cor test between fruit and flower 
+                  fixed_substrate1 = as.numeric(fixed_substrate)) %>%
+    dplyr::filter(fixed_substrate %in% c("Fruit/nut/veg", "Flower"))
+  
+# plot population size vs substrate scatter 
+plot_co_test <- ggplot(cor_test_df_co %>% dplyr::filter(spp_id == "C. sp. 53")) +
+  aes(x = fixed_substrate1, y = approx_pop2, fill = fixed_substrate) +
+  geom_jitter(width = 0.025, height = 0.025, shape = 21, size = 3) +
+  geom_smooth(method = lm, inherit.aes = F, aes(x = fixed_substrate1, y = approx_pop2))
+plot_co_test
 
 
-
-
-Fig <- ggplot(data = test) +
-  geom_bar(stat = "identity", position = "dodge", aes(x = factor(approximate_number_of_worms), y = perc_pop_size, fill = spp_id))
-  #scale_fill_manual(values=c(species_palette)) +
-  #coord_flip() + 
-  theme(axis.title = element_text(size = 10, color = "black"),
-        axis.text = element_text(size = 10, color = "black"),
-        legend.text = element_text(size = 10, color = "black")) +
-  labs(fill = "", x = "", y = "Percentage of all collections") +
-  guides(fill = guide_legend(reverse = T)) +
-  scale_y_continuous(breaks = c(2.5, 5.0, 7.5, 10), limits = c(0, 10.5))
-Fig2B_v2
-
+######################
 ## count multiples
 multiples <- cso %>%
   dplyr::filter(spp_id %in% c("C. elegans", "C. tropicalis", "C. briggsae",  "C. sp. 53")) %>%
