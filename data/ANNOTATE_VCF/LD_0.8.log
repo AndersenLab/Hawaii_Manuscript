@@ -1,0 +1,36 @@
+PLINK v1.90b5.2 64-bit (9 Jan 2018)
+Options in effect:
+  --allow-extra-chr
+  --biallelic-only
+  --extract data/ANNOTATE_VCF/LD_0.8.prune.in
+  --maf 0.004
+  --out data/ANNOTATE_VCF/LD_0.8
+  --recode vcf
+  --set-missing-var-ids @:#
+  --snps-only
+  --vcf data/ANNOTATE_VCF/Ce330_annotated.vcf.gz
+
+Hostname: rbs-129-105-149-248.chem.northwestern.edu
+Working directory: /Users/stefan/AndersenLab/Github_Repos/Hawaii_Manuscript
+Start time: Tue Apr 30 17:05:26 2019
+
+Random number seed: 1556661926
+32768 MB RAM detected; reserving 16384 MB for main workspace.
+--vcf: data/ANNOTATE_VCF/LD_0.8-temporary.bed +
+data/ANNOTATE_VCF/LD_0.8-temporary.bim + data/ANNOTATE_VCF/LD_0.8-temporary.fam
+written.
+639806 variants loaded from .bim file.
+639806 missing IDs set.
+276 people (0 males, 0 females, 276 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to data/ANNOTATE_VCF/LD_0.8.nosex .
+--extract: 117939 variants remaining.
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 276 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+0 variants removed due to minor allele threshold(s)
+(--maf/--max-maf/--mac/--max-mac).
+117939 variants and 276 people pass filters and QC.
+Note: No phenotypes present.
+--recode vcf to data/ANNOTATE_VCF/LD_0.8.vcf ... done.
+
+End time: Tue Apr 30 17:05:43 2019
