@@ -4,6 +4,8 @@ library(pophelper)
 library(tidyverse)
 library(ggthemes)
 
+VCF_PATH="data/ANNOTATE_VCF/LD_0.8.vcf.gz"
+
 # hawaii strains
 strain_islands <- c("XZ1514" = "#E69F00", "XZ1516" = "#E69F00","XZ1513" = "#E69F00","ECA372" = "#E69F00","ECA701" = "#E69F00","XZ1515" = "#E69F00",
                     "CB4856" = "#56B4E9",
@@ -153,7 +155,7 @@ ggsave(ksummary_plot, filename = "plots/SuppFigureXX_KSummary_LD8.png", height =
 
 
 strain_vector <- paste(sort(names(strain_islands)), sep = ",", collapse = ",")
-system(glue::glue("bcftools view -s {strain_vector} data/ANNOTATE_VCF/Ce330_annotated.vcf.gz -Oz -o data/ANNOTATE_VCF/Hawaii.vcf.gz"))
+system(glue::glue("bcftools view -s {strain_vector} {VCF_PATH} -Oz -o data/ANNOTATE_VCF/Hawaii.vcf.gz"))
 # Generate nexus file, .nexus file is used for SplitsTree
 system(glue::glue("python scripts/vcf2phylip.py -i data/ANNOTATE_VCF/Hawaii.vcf.gz -m 43 --fasta --nexus --nexus-binary"))
 
@@ -164,7 +166,7 @@ for(apops in unique(representative_K_strains$K_size)){
   # extract number of strain variable
   n_strains <- length(sort(c(as.character(koi$samples), names(strain_islands))))
   # Subset VCF to contain strains of interest - Hawaiian and representative strains
-  system(glue::glue("bcftools view -s {strain_vector} data/ANNOTATE_VCF/Ce330_annotated.vcf.gz -Oz -o data/ANNOTATE_VCF/Hawaii_K{apops}.vcf.gz"))
+  system(glue::glue("bcftools view -s {strain_vector} {VCF_PATH} -Oz -o data/ANNOTATE_VCF/Hawaii_K{apops}.vcf.gz"))
   # Generate nexus file, .nexus file is used for SplitsTree
   system(glue::glue("python scripts/vcf2phylip.py -i data/ANNOTATE_VCF/Hawaii_K{apops}.vcf.gz -m {n_strains} --fasta --nexus --nexus-binary"))
 }
