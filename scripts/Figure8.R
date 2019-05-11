@@ -416,7 +416,7 @@ df <- data.table::fread("data/WI_strain_list.csv")
 
   world_plot <- ggplot()+ geom_map(data=world, map=world,
                                    aes(x=long, y=lat, map_id=region),
-                                   color="black", fill="#7f7f7f", size=0.5)+
+                                   color="black", fill="#E6E6E6", size=0.25)+
     scale_fill_manual(values = ancestry.colours,name = "Population")+
     theme_map()+
     geom_label_repel(aes(long, lat, label = strain, fill = cluster),
@@ -424,13 +424,59 @@ df <- data.table::fread("data/WI_strain_list.csv")
                      fontface = 'bold', color = 'white',
                      segment.color = 'cyan')+
     theme(legend.position = "none")+
-    coord_cartesian(xlim = c(-160,-155), ylim = c(19,22.3))
-
+    coord_quickmap(xlim = c(-160,-155), ylim = c(19,22.3)) # coord_quickmap keeps correct aspect ratio
   
   ggsave(world_plot, filename = "plots/K7_HW_MAP_Admix.pdf",
          height = 10,
          width = 10)
- 
+
+# plot global populations
+  # get admix
+  full_isolation_info <- df %>%
+    #dplyr::filter(reference_strain == 1) %>%
+    dplyr::select(isotype, long = longitude, lat = latitude, state, country) %>%
+    dplyr::filter(lat != "None") %>%
+    dplyr::left_join(.,admix,by="isotype") %>%
+    dplyr::distinct(isotype, long, lat, .keep_all = TRUE) %>%
+    dplyr::filter(!is.na(pop_assignment))
+  
+  full_world_plot <- ggplot()+ geom_map(data=world, map=world,
+                                   aes(x=long, y=lat, map_id=region),
+                                   color="black", fill="#E6E6E6", size=0.25)+
+    scale_fill_manual(values = ancestry.colours,name = "Population")+
+    theme_map()+
+    geom_point(aes(long, lat, fill = pop_assignment),
+               data=full_isolation_info %>%
+                 dplyr::filter(pop_assignment != "C"),
+               shape = 21, size = 3) +
+    geom_point(aes(long, lat, fill = pop_assignment),
+               data=full_isolation_info %>%
+                 dplyr::filter(pop_assignment == "C"),
+                                shape = 21, size = 3) +
+    theme(legend.position = "none") +
+    coord_quickmap()
+  
+  ggsave(full_world_plot, filename = "plots/K7_world_MAP_Admix.pdf", useDingbats = F,
+         height = 7.5,
+         width = 7.5)
+
+  euro_plot <- ggplot()+ geom_map(data=world, map=world,
+                                        aes(x=long, y=lat, map_id=region),
+                                        color="black", fill="#E6E6E6", size=0.25)+
+    scale_fill_manual(values = ancestry.colours,name = "Population")+
+    theme_map()+
+    geom_point(aes(long, lat, fill = pop_assignment),
+               data=full_isolation_info %>%
+                  dplyr::mutate(pop_assignment = factor(pop_assignment, level = c("A", "B", "D", "E", "C", "G", "F"))) %>%
+                  dplyr::arrange(pop_assignment),
+               shape = 21, size = 2) +
+    theme(legend.position = "none") +
+    coord_quickmap(xlim = c(-10, 39), ylim = c(35, 71))
+  
+  ggsave(euro_plot, filename = "plots/K7_euro_MAP_Admix.pdf", useDingbats = F,
+        height = 3,
+        width = 3)
+  
 # stats on island and substrate asociations for admixture groups
 # assign Hawaii isotypes
 hi_only_samples <- read.csv(file = "data/fulcrum/hawaii_isotypes.csv") 
