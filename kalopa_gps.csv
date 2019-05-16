@@ -1,0 +1,4 @@
+"","lat","long","c_label","grid_num","fixed_substrate","isotype","sub_pop","env_par","value","sub_pop2","filter_25m","kalopa","volcano_1","volcano_2","maui","kauai","geo_cluster","mean_value_25m","value_thinned"
+"1",20.039858,-155.441608,"C-2824",3,"Fruit/nut/veg","ECA760","C","altitude",670.8930041,"Hawaiian Admixed",TRUE,TRUE,FALSE,FALSE,FALSE,FALSE,"kalopa",663.547209444444,663.547209444444
+"2",20.038831,-155.438922,"C-3133",NA,"Leaf litter","ECA703","C","altitude",649.9944751,"Hawaiian Admixed",FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,"kalopa",653.1624918,649.9944751
+"3",20.039656,-155.438103,"C-3178",NA,"Leaf litter","ECA710","C","altitude",656.3305085,"Hawaiian Admixed",FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,"kalopa",653.1624918,656.3305085

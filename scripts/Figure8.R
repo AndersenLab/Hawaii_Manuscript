@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 library(tidyverse)
+library(cowplot)
 library(geonames)
 library(viridis)
 library(ggrepel)
@@ -131,7 +132,7 @@ load('data/fulcrum/df.Rda')
   hm_hi4[filter_box(hm_hi4$longitude, hm_hi4$latitude, c(-157.327, 21.0328, -156.685, 21.2574)), "island"] <- "Molokai"
   hm_hi4[filter_box(hm_hi4$longitude, hm_hi4$latitude, c(-156.7061, 20.4712, -155.9289, 21.0743)), "island"] <- "Maui"
   hm_hi4[filter_box(hm_hi4$longitude, hm_hi4$latitude, c(-156.1346, 18.6619, -154.6985, 20.4492)), "island"] <- "Big Island"
-  
+
   # Identify most common island for isotypes
   hm_hi5 <- hm_hi4 %>%
     dplyr::group_by(isotype) %>%
@@ -163,7 +164,6 @@ load('data/fulcrum/df.Rda')
   
   write.table(hm_hi_proc, file = "data/fulcrum/HW_isotype_collection_parameters_processed.tsv",
               col.names = T, quote = F, row.names = F, sep = "\t")
-
 
 # load in wi strain info for lat long coordinates for map
 df <- data.table::fread("data/WI_strain_list.csv")
@@ -224,10 +224,7 @@ df <- data.table::fread("data/WI_strain_list.csv")
 
   admix_legend <- cowplot::get_legend(temp_admix_plot)
 
-  
-#  2
-#  Generate stats for continuous variables
-  # stats on island and substrate asociations for admixture groups
+###  Generate stats for continuous variables
   # assign Hawaii isotypes
   hi_only_samples <- read.csv(file = "data/fulcrum/hawaii_isotypes.csv") 
   
@@ -280,43 +277,6 @@ df <- data.table::fread("data/WI_strain_list.csv")
     #dplyr::mutate(remove = ifelse(length))
     tidyr::gather(env_par, value, -lat, -long, -c_label, -grid_num, -fixed_substrate, -isotype, -sub_pop)
   
-  ass_stats_cont_small_grid <- ass_stats %>%
-    dplyr::select(lat = latitude, long = longitude,
-                  c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
-                  ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
-    dplyr::mutate(sub_pop = factor(sub_pop)) %>%
-    dplyr::distinct(grid_num, sub_pop, .keep_all = T) %>%
-    dplyr::filter(!is.na(grid_num))
-  
-  ass_stats_cont_small_nogrid <- ass_stats %>%
-    dplyr::select(lat = latitude, long = longitude,
-                  c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
-                  ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
-    dplyr::mutate(sub_pop = factor(sub_pop)) %>%
-    dplyr::distinct(c_label, sub_pop, .keep_all = T) %>%
-    dplyr::filter(is.na(grid_num))
-  
-  ass_stats_cont_small <- full_join(ass_stats_cont_small_nogrid, ass_stats_cont_small_grid) %>%
-    tidyr::gather(env_par, value, -lat, -long, -c_label, -grid_num, -fixed_substrate, -isotype, -sub_pop) %>%
-    dplyr::group_by(sub_pop, env_par) %>%
-    dplyr::mutate(pop_par_mean_small = mean(value, na.rm = T)) %>%
-    dplyr::ungroup()
-  
-  ass_stats_cont_small_grouped <- ass_stats_cont_small %>%
-    dplyr::mutate(sub_pop2 = ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed")) %>%
-    dplyr::ungroup() %>%
-    # for identifying filtered data points in panel plot
-    dplyr::mutate(id = paste(lat,long,c_label,isotype))
-  
-  # Include temporarly means for pops to add to plot. These are from ass_stats_cont_small
-  elv_means <- c("c_mean_alt" = 791.11,
-            "f_mean_alt" = 1320.14,
-            "g_mean_alt" =1005.16)
-  
-  stemp_means <- c("c_mean_temp" = 20.29,
-                   "f_mean_temp" = 18.10,
-                   "g_mean_temp" = 17.38)
-  
   # gather data to long format for plotting
   ass_stats_long <- ass_stats %>%
     dplyr::select(lat = latitude, long = longitude,
@@ -326,13 +286,135 @@ df <- data.table::fread("data/WI_strain_list.csv")
     dplyr::group_by(sub_pop, env_par) %>%
     dplyr::mutate(pop_par_mean_full = mean(value, na.rm = T)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(id = paste(lat,long,c_label,isotype)) %>%
-    dplyr::mutate(filtered = ifelse(id %in% ass_stats_cont_small_grouped$id, 1, 0))
+    dplyr::mutate(id = paste(lat,long,c_label,isotype))
+  
+  #### Calculate distnaces among c_labels in meters for thinning dataset
+  # generate all pairs
+  pair <- apply(ass_stats_long %>%
+                  dplyr::filter(env_par == "altitude") %>%
+                  dplyr::distinct(c_label, .keep_all = T), # only need to compare c_labels for stats, not worried about retaining isotype, pop_assignment info  
+                2, combn, m=2)
+  
+  # extract pairs to side by side for pair matirx [c(T,F),] = odd rows.
+  left_pair <- as.data.frame(pair[ c(TRUE,FALSE), ]) 
+  right_pair <- as.data.frame(pair[ !c(TRUE,FALSE), ])
+  colnames(right_pair) <- paste("r", colnames(right_pair), sep = "_")
+  
+  # measure distances between all pairs
+  dist <- cbind(left_pair,right_pair) %>%
+    # assign lat and long back to numeric 
+    dplyr::mutate(lat = as.double(as.character(lat)),
+                  long = as.double(as.character(long)),
+                  r_lat = as.double(as.character(r_lat)),
+                  r_long = as.double(as.character(r_long)),
+                  grid_num = as.double(as.character(grid_num)),
+                  r_grid_num = as.double(as.character(r_grid_num)),
+                  gridsect3 = ifelse(grid_num == 3 & r_grid_num == 3, TRUE, FALSE)) %>%
+    # force dplyr to perform distHaversine function on rows
+    dplyr::rowwise() %>%
+    dplyr::mutate(distance = distHaversine(c(long, lat), c(r_long, r_lat)),
+                  under25meters = ifelse(distance < 25, TRUE, FALSE),
+                  under50meters = ifelse(distance < 50, TRUE, FALSE),
+                  under100meters = ifelse(distance < 100, TRUE, FALSE))
+  
+  # Plot histogram of distances for all
+  ggplot(dist) +
+    aes(x = distance,  fill = under25meters) +
+    #geom_point()
+    geom_histogram(binwidth = 1000)
+  
+  # extract all c_labels w/ c. elegans within 25 meters of another c_label w/ c. elegans 
+  dist_filter <- dist %>%
+    dplyr::filter(under25meters == TRUE) %>%
+    dplyr::select(c_label, r_c_label) %>%
+    tidyr::gather() %>%
+    dplyr::distinct(value) %>%
+    dplyr::rename(c_label = value)
+  
+  #Group populations F and G grouped as non-admixed populations and average env_par for isotypes on c_labels in manually assigned <25 meter clusters
+  ass_stats_cont_dist_filtered_1 <- ass_stats_cont %>%
+    dplyr::mutate(sub_pop2 = as.factor(ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed"))) %>%
+    dplyr::mutate(filter_25m = ifelse(c_label %in% dist_filter$c_label, TRUE, FALSE),
+                  kalopa =filter_box(ass_stats_cont$long, ass_stats_cont$lat, c(-155.454909,20.02578,-155.430115,20.049951)),
+                  volcano_1 =filter_box(ass_stats_cont$long, ass_stats_cont$lat, c(-155.2243537309,19.4221224043,-155.2216236884,19.424155)),   
+                  volcano_2 =filter_box(ass_stats_cont$long, ass_stats_cont$lat, c(-155.222287312,19.424165,-155.2195572695,19.4259669944)),
+                  maui = ifelse(isotype %in% c("QX1793", "QX1794"), TRUE, FALSE),
+                  kauai = ifelse(isotype %in% c("XZ1514", "XZ1515", "XZ1516"), TRUE, FALSE),
+                  geo_cluster = case_when(kalopa == T ~ "kalopa",
+                                          volcano_1 == T ~ "volcano_1",
+                                          volcano_2 == T ~ "volcano_2",
+                                          maui == T ~ "maui",
+                                          kauai == T ~ "kauai")) %>%
+    dplyr::group_by(env_par, sub_pop2, geo_cluster, filter_25m) %>%
+    dplyr::mutate(mean_value_25m = mean(value, na.rm = T)) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(value_thinned = ifelse(filter_25m == TRUE, mean_value_25m, value))
+  
+  # label filtered samples for plotting 
+  ass_stats_long <- ass_stats_long %>%
+    dplyr::mutate(filtered = ifelse(c_label %in% dist_filter$c_label, 0, 1))
+  
+  # extract unique thinned values for each env_par, sub_pop2, geo_cluster
+  ass_stats_cont_dist_filtered <- ass_stats_cont_dist_filtered_1 %>%
+    dplyr::distinct(env_par, sub_pop2, geo_cluster, value_thinned, .keep_all = T)
+  
+  ###perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
+  Dunn_list_dist_filtered <- list()
+  for (e in 1:length(unique(ass_stats_cont_dist_filtered$env_par))){
+    KM_df <- ass_stats_cont_dist_filtered %>%
+      dplyr::filter(env_par == (unique(ass_stats_cont_dist_filtered$env_par)[e]))
+    
+    D_test <- dunnTest(KM_df$value_thinned ~ KM_df$sub_pop2, method = "bonferroni") 
+    Dunn_list_dist_filtered[[unique(ass_stats_cont_dist_filtered$env_par)[e]]] <- D_test
+  }
+  Dunn_list_dist_filtered
+  
+  ### Plotting supplemental figure env_par for admix pops
+  elevation_p <- ggplot(ass_stats_cont_dist_filtered %>% tidyr::spread(env_par, value_thinned)) +
+    aes(x = sub_pop2, y = altitude) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(aes(x = sub_pop2, y = altitude, fill = sub_pop), width = 0.25, size = 3, shape = 21) +
+    theme_bw() +
+    scale_fill_manual(values=c(ancestry.colours)) +
+    labs(y = "Elevation (m)", x = "") +
+    theme_bw() +
+    theme(legend.position="none") 
+  elevation_p
+  
+  sub_temp_p <- ggplot(ass_stats_cont_dist_filtered %>% tidyr::spread(env_par, value_thinned)) +
+    aes(x = sub_pop2, y = substrate_temperature) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(aes(x = sub_pop2, y = substrate_temperature, fill = sub_pop), width = 0.25, size = 3, shape = 21) +
+    scale_fill_manual(values=c(ancestry.colours)) +
+    labs(y = "Substrate temperature (°C)", x = "") +
+    theme_bw() +
+    theme(legend.position="none") 
+  sub_temp_p
+  
+  k7_box_plots <- cowplot::plot_grid(elevation_p, sub_temp_p)
+  k7_box_plots
+  ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_25mfiltered_GFgrouped.pdf', width = 7.5, height = 5, useDingbats = F)
+  
+  ### Plot Figure 8 
+  #Include temporarly means for pops to add to plot. These are from ass_stats_cont_dist_filtered
+  env_means <- ass_stats_cont_dist_filtered %>%
+    dplyr::group_by(env_par, sub_pop) %>%
+    dplyr::mutate(population_mean_value = mean(value, na.rm = T)) %>%
+    dplyr::ungroup() %>%
+    dplyr::distinct(env_par, sub_pop, population_mean_value)
+  
+  elv_means <- c("c_mean_alt" = 821.83885,
+            "f_mean_alt" = 1362.78665,
+            "g_mean_alt" =966.44687)
+  
+  stemp_means <- c("c_mean_temp" = 20.25000,
+                   "f_mean_temp" = 18.07500,
+                   "g_mean_temp" = 17.92000)
   
   # 3
   # plot elevation
   elevation_plot <- ggplot(ass_stats_long %>% tidyr::spread(env_par, value)) +
-    aes(x = factor(isotype, levels = plot_order$samples), y = altitude, fill = sub_pop, alpha = filtered) + # alpha = filtered; reveals what data points are filtered out for stats
+    aes(x = factor(isotype, levels = plot_order$samples), y = altitude, fill = sub_pop) + # alpha = filtered; reveals what data points are filtered out for stats
     scale_fill_manual(values = ancestry.colours) +
     geom_jitter(width = 0.1, shape = 21, size = 2.5) +
     geom_segment(aes(x=0,xend=26,y=elv_means[1],yend=elv_means[1]), color = ancestry.colours["C"], size=0.75) +
@@ -361,7 +443,7 @@ df <- data.table::fread("data/WI_strain_list.csv")
   
   # plot sub temp
   sub_temp_plot <- ggplot(ass_stats_long %>% tidyr::spread(env_par, value)) +
-    aes(x = factor(isotype, levels = plot_order$samples), y = substrate_temperature, fill = sub_pop, alpha = filtered) +
+    aes(x = factor(isotype, levels = plot_order$samples), y = substrate_temperature, fill = sub_pop) + #, alpha = filtered
     scale_fill_manual(values = ancestry.colours) +
     geom_jitter(width = 0.1, shape = 21, size = 2.5) +
     geom_segment(aes(x=0,xend=26,y=stemp_means[1],yend=stemp_means[1]), color = ancestry.colours["C"], size=0.75) +
@@ -393,9 +475,9 @@ df <- data.table::fread("data/WI_strain_list.csv")
                             sub_temp_plot_no_legend, admix_legend,
                             ncol = 2, nrow = 3, align = "vh", rel_heights = c(1,.4,.5), rel_widths =c(1, .25), axis = 'l') #,  axis = 'l'
   
-  ggsave("plots/Figure_8_all_data.pdf", width = 7.5, height = 5, useDingbats=FALSE)
+  ggsave("plots/Figure_8_all_data_25m_filtered.pdf", width = 7.5, height = 5, useDingbats=FALSE)
   
-######### plot map file supplement  
+#5 plot HI map file supplement  
   strain_pops <- dplyr::filter(long_admix_pops, frac_cluster == max_frac) %>%
     dplyr::rename(strain=samples)
   
@@ -430,7 +512,7 @@ df <- data.table::fread("data/WI_strain_list.csv")
          height = 10,
          width = 10)
 
-# plot global populations
+#6 plot global populations
   # get admix
   full_isolation_info <- df %>%
     #dplyr::filter(reference_strain == 1) %>%
@@ -459,7 +541,8 @@ df <- data.table::fread("data/WI_strain_list.csv")
   ggsave(full_world_plot, filename = "plots/K7_world_MAP_Admix.pdf", useDingbats = F,
          height = 7.5,
          width = 7.5)
-
+  
+# 7 plot euro map
   euro_plot <- ggplot()+ geom_map(data=world, map=world,
                                         aes(x=long, y=lat, map_id=region),
                                         color="black", fill="#E6E6E6", size=0.25)+
@@ -476,286 +559,13 @@ df <- data.table::fread("data/WI_strain_list.csv")
   ggsave(euro_plot, filename = "plots/K7_euro_MAP_Admix.pdf", useDingbats = F,
         height = 3,
         width = 3)
-  
-# stats on island and substrate asociations for admixture groups
-# assign Hawaii isotypes
-hi_only_samples <- read.csv(file = "data/fulcrum/hawaii_isotypes.csv") 
 
-# load admix info for full 276_set for K = 7
-admix <- data.table::fread("data/ADMIXTURE_LD8/BEST_K/K7_Processed_Ancestry.tsv") %>%
-  dplyr::rename(isotype = samples) %>%
-  tidyr::gather(pop, frac_pop, - isotype) %>%
-  dplyr::group_by(isotype) %>%
-  dplyr::mutate(max_pop_frac = max(frac_pop)) %>%
-  dplyr::ungroup() %>%
-  dplyr::arrange(pop, max_pop_frac) %>%
-  dplyr::mutate(isotype = factor(isotype)) %>%
-  dplyr::group_by(isotype) %>%
-  dplyr::mutate(pop_assignment = ifelse(max_pop_frac == frac_pop, pop, NA)) %>%
-  dplyr::arrange(isotype, pop_assignment) %>%
-  tidyr::fill(pop_assignment) %>%
-  tidyr::spread(pop, frac_pop) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(Hawaiian = ifelse(isotype %in% hi_only_samples$isotype, "TRUE", "FALSE"))
-
-# load data frame to do stats, may need to manually run code lines in loop above to get hm_hi5 df
-ass_stats <- left_join(hm_hi5, cso %>% dplyr::filter(!is.na(isotype)) %>% dplyr::select(s_label, grid_num)) %>%
-  dplyr::filter(!is.na(isotype)) %>%
-  # Filter non-type strains from ECA189 isotype and ECA396 isotype
-  dplyr::mutate(filter = case_when(
-                                  isotype == "ECA189" & strain != "ECA189" ~ T,
-                                  isotype == "ECA396" & strain != "ECA396" ~ T)) %>%
-  dplyr::mutate(filter = ifelse(is.na(filter), F, filter)) %>%
-  dplyr::filter(filter == F) %>%
-  # Filter to distinct c_labels for each isotype
-  dplyr::distinct(c_label, isotype, .keep_all = TRUE)
-
-# join admix and ass_stats
-ass_stats <- left_join(ass_stats, admix) %>%
-  group_by(c_label) %>%
-  # make artifical c_label for Hawaiian isotypes collected prior to 2017 trip
-  dplyr::mutate(c_label2 = as.character(ifelse(is.na(c_label), row_number(), c_label))) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(c_label = c_label2)
-
-# gather data to long format for plotting
-ass_stats_long <- ass_stats %>%
-  dplyr::select(lat = latitude, long = longitude,
-                c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
-                ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
-  tidyr::gather(env_par, value, -lat, -long, -c_label, -grid_num, -fixed_substrate, -isotype, -sub_pop) %>%
-  dplyr::group_by(sub_pop, env_par) %>%
-  dplyr::mutate(pop_par_mean_full = mean(value, na.rm = T)) %>%
-  dplyr::ungroup()
-
-# filter for continuous variables with only one sample for each sub population
-ass_stats_cont <- ass_stats %>%
-  dplyr::select(lat = latitude, long = longitude,
-                c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
-                ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
-  # Filter for one representative isotype from a c_label
-  dplyr::distinct(c_label, sub_pop, .keep_all = T) %>%
-  dplyr::mutate(sub_pop = factor(sub_pop)) %>%
-  #dplyr::group_by(grid_num) %>%
-  #dplyr::mutate(remove = ifelse(length))
-  tidyr::gather(env_par, value, -lat, -long, -c_label, -grid_num, -fixed_substrate, -isotype, -sub_pop)
-
-ass_stats_cont_small_grid <- ass_stats %>%
-  dplyr::select(lat = latitude, long = longitude,
-                c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
-                ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
-  dplyr::mutate(sub_pop = factor(sub_pop)) %>%
-  dplyr::distinct(grid_num, sub_pop, .keep_all = T) %>%
-  dplyr::filter(!is.na(grid_num))
-
-ass_stats_cont_small_nogrid <- ass_stats %>%
-  dplyr::select(lat = latitude, long = longitude,
-                c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
-                ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
-  dplyr::mutate(sub_pop = factor(sub_pop)) %>%
-  dplyr::distinct(c_label, sub_pop, .keep_all = T) %>%
-  dplyr::filter(is.na(grid_num))
-
-ass_stats_cont_small <- full_join(ass_stats_cont_small_nogrid, ass_stats_cont_small_grid) %>%
-  tidyr::gather(env_par, value, -lat, -long, -c_label, -grid_num, -fixed_substrate, -isotype, -sub_pop) %>%
-  dplyr::group_by(sub_pop, env_par) %>%
-  dplyr::mutate(pop_par_mean_small = mean(value, na.rm = T)) %>%
-  dplyr::ungroup()
-
-# perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
-options(scipen=999)
-Dunn_list <- list()
-
-for (e in 1:length(unique(ass_stats_cont$env_par))){
-  KM_df <- ass_stats_cont %>%
-    dplyr::filter(env_par == (unique(ass_stats_cont$env_par)[e]))
-  
-  D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop, method = "bonferroni") 
-  Dunn_list[[unique(ass_stats_cont$env_par)[e]]] <- D_test
-}
-  
-Dunn_list
-
-# box plots showing with test from above
-ggplot(ass_stats_cont %>% tidyr::spread(env_par, value)) +
-  aes(x = sub_pop, y = altitude) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(wdith = 0.25, alpha = 0.5, shape = 21)
-
-# do it again but with samples restricted to one representative admix population per gridsect 
-#perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
-options(scipen=999)
-Dunn_list_filtered <- list()
-
-for (e in 1:length(unique(ass_stats_cont_small$env_par))){
-  KM_df <- ass_stats_cont_small %>%
-    dplyr::filter(env_par == (unique(ass_stats_cont_small$env_par)[e]))
-  
-  D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop, method = "bonferroni") 
-  Dunn_list_filtered[[unique(ass_stats_cont_small$env_par)[e]]] <- D_test
-}
-
-Dunn_list_filtered
-
-# box plots showing with test from above K=7 global
-altitude_small <- ggplot(ass_stats_cont_small %>% tidyr::spread(env_par, value)) +
-  aes(x = sub_pop, y = altitude) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(wdith = 0.25, alpha = 0.5) +
-  theme_bw()
-altitude_small
-
-sub_temp_small <- ggplot(ass_stats_cont_small %>% tidyr::spread(env_par, value)) +
-  aes(x = sub_pop, y = substrate_temperature) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(wdith = 0.25, alpha = 0.5) +
-  theme_bw()
-sub_temp_small
-
-k7_box_plots <- cowplot::plot_grid(altitude_small, sub_temp_small)
-k7_box_plots
-ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_filtered.pdf', width = 7.5, height = 7.5)
-
-##############
-############## same as above but with populations F and G grouped as non-admixed populations
-# do it again but with samples restricted to one representative admix population per gridsect 
-#perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
-ass_stats_cont_small_grouped <- ass_stats_cont_small %>%
-  dplyr::mutate(sub_pop2 = ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed"))
-
-options(scipen=999)
-Dunn_list_filtered_grouped <- list()
-
-for (e in 1:length(unique(ass_stats_cont_small_grouped$env_par))){
-  KM_df <- ass_stats_cont_small_grouped %>%
-    dplyr::filter(env_par == (unique(ass_stats_cont_small_grouped$env_par)[e]))
-  
-  D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop2, method = "bonferroni") 
-  Dunn_list_filtered_grouped[[unique(ass_stats_cont_small_grouped$env_par)[e]]] <- D_test
-}
-
-Dunn_list_filtered_grouped
-
-# box plots showing with test from above K=7 global with grouped F and G
-altitude_small_grouped <- ggplot(ass_stats_cont_small_grouped %>% tidyr::spread(env_par, value)) +
-  aes(x = sub_pop2, y = altitude) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.25, alpha = 0.5) +
-  theme_bw()
-altitude_small_grouped
-
-sub_temp_small_grouped <- ggplot(ass_stats_cont_small_grouped %>% tidyr::spread(env_par, value)) +
-  aes(x = sub_pop2, y = substrate_temperature) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.25, alpha = 0.5) +
-  theme_bw()
-sub_temp_small_grouped
-
-k7_box_plots <- cowplot::plot_grid(altitude_small_grouped, sub_temp_small_grouped)
-k7_box_plots
-ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_filtered_GFgrouped.pdf', width = 7.5, height = 7.5)
-
-###############################################
-# do fisher exact test for substrate enrichment 
-ass_sub<- ass_stats %>%
-  dplyr::distinct(isotype, grid_num, fixed_substrate, .keep_all = T) %>%
-  dplyr::group_by(fixed_substrate) %>%
-  dplyr::mutate(tot_sub_num = n()) %>%
-  dplyr::mutate(c = ifelse(pop_assignment == "C", 1, NA),
-                f = ifelse(pop_assignment == "F", 1, NA)) %>%
-  dplyr::group_by(fixed_substrate, pop_assignment) %>%
-  dplyr::mutate(c = na.pass(sum(c)),
-                f = na.pass(sum(f))) %>%
-  dplyr::ungroup()
-
-ass_sub_f <- ass_sub %>%
-  dplyr::filter(pop_assignment == "F") %>%
-  dplyr::mutate(no_f = tot_sub_num-f,
-                f = f) %>%
-  dplyr::select(fixed_substrate, no_f, f) %>%
-  dplyr::distinct(fixed_substrate, .keep_all=TRUE) %>%
-  column_to_rownames(var = "fixed_substrate") %>%
-  as.matrix(.)
-
-ass_sub_c <- ass_sub %>%
-  dplyr::filter(pop_assignment == "C") %>%
-  dplyr::mutate(no_c = tot_sub_num-c,
-                c = c) %>%
-  dplyr::select(fixed_substrate, no_c, c) %>%
-  dplyr::distinct(fixed_substrate, .keep_all=TRUE) %>%
-  column_to_rownames(var = "fixed_substrate") %>%
-  as.matrix(.)
-
-# full chi squared test to see if there are differernces 
-chisq.test(ass_sub_f, simulate.p.value = TRUE)
-
-# full chi squared test to see if there are differernces 
-chisq.test(ass_sub_c, simulate.p.value = TRUE)
-
-
-# do fisher exact test for Island enrichment 
-ass_sub<- ass_stats %>%
-  dplyr::distinct(isotype, grid_num, island, .keep_all = T) %>%
-  dplyr::group_by(island) %>%
-  dplyr::mutate(tot_sub_num = n()) %>%
-  dplyr::mutate(c = ifelse(pop_assignment == "C", 1, NA),
-                f = ifelse(pop_assignment == "F", 1, NA),
-                g = ifelse(pop_assignment == "G", 1, NA)) %>%
-  dplyr::group_by(island, pop_assignment) %>%
-  dplyr::mutate(c = na.pass(sum(c)),
-                f = na.pass(sum(f)),
-                g = na.pass(sum(g))) %>%
-  dplyr::ungroup()
-
-ass_i_f <- ass_sub %>%
-  dplyr::filter(pop_assignment == "F") %>%
-  dplyr::mutate(no_f = tot_sub_num-f,
-                f = f) %>%
-  dplyr::select(island, no_f, f) %>%
-  dplyr::distinct(island, .keep_all=TRUE) %>%
-  column_to_rownames(var = "island") %>%
-  as.matrix(.)
-
-ass_i_c <- ass_sub %>%
-  dplyr::filter(pop_assignment == "C") %>%
-  dplyr::mutate(no_c = tot_sub_num-c,
-                c = c) %>%
-  dplyr::select(island, no_c, c) %>%
-  dplyr::distinct(island, .keep_all=TRUE) %>%
-  column_to_rownames(var = "island") %>%
-  as.matrix(.)
-
-ass_i_g <- ass_sub %>%
-  dplyr::filter(pop_assignment == "G") %>%
-  dplyr::mutate(no_g = tot_sub_num-g,
-                g = g) %>%
-  dplyr::select(island, no_g, g) %>%
-  dplyr::distinct(island, .keep_all=TRUE) %>%
-  column_to_rownames(var = "island") %>%
-  as.matrix(.)
-
-# full chi squared test to see if there are differernces 
-chisq.test(ass_i_f, simulate.p.value = TRUE)
-
-pairwiseNominalIndependence(ass_i_f,
-                            fisher = TRUE,
-                            gtest  = FALSE,
-                            chisq  = FALSE,
-                            method = "bonferroni", simulate.p.value = TRUE)
-
-# full chi squared test to see if there are differernces 
-chisq.test(ass_i_c, simulate.p.value = TRUE)
-
-# full chi squared test to see if there are differernces. not needed for G b/c only found on BIg Island
-#chisq.test(ass_i_g, simulate.p.value = TRUE)
-
-
-####################### Calculate distnaces among isotypes in meters
-# calculate expected pairs in set given number of samples in set is 68
-choose(68,2)
-
+# Calculate distnaces among c_labels in meters for thinning dataset
 # generate all pairs
-pair <- apply(ass_stats_long%>% dplyr::filter(env_par == "altitude"), 2, combn, m=2)
+pair <- apply(ass_stats_long %>%
+                dplyr::filter(env_par == "altitude") %>%
+                dplyr::distinct(c_label, .keep_all = T), # only need to compare c_labels for stats, not worried about retaining isotype, pop_assignment info  
+              2, combn, m=2)
 
 # extract pairs to side by side for pair matirx [c(T,F),] = odd rows.
 left_pair <- as.data.frame(pair[ c(TRUE,FALSE), ]) 
@@ -770,49 +580,213 @@ dist <- cbind(left_pair,right_pair) %>%
                 r_lat = as.double(as.character(r_lat)),
                 r_long = as.double(as.character(r_long)),
                 grid_num = as.double(as.character(grid_num)),
-                r_grid_num = as.double(as.character(r_grid_num))) %>%
+                r_grid_num = as.double(as.character(r_grid_num)),
+                gridsect3 = ifelse(grid_num == 3 & r_grid_num == 3, TRUE, FALSE)) %>%
   # force dplyr to perform distHaversine function on rows
   dplyr::rowwise() %>%
-  dplyr::mutate(distance = distHaversine(c(long, lat), c(r_long, r_lat)))
+  dplyr::mutate(distance = distHaversine(c(long, lat), c(r_long, r_lat)),
+                under25meters = ifelse(distance < 25, TRUE, FALSE),
+                under50meters = ifelse(distance < 50, TRUE, FALSE),
+                under100meters = ifelse(distance < 100, TRUE, FALSE))
 
-# filter to one unique isotype from each sub_population within 100 m of each other
-dist_filtered <- dist %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(filter = ifelse(as.character(isotype) == as.character(r_isotype), T, F)) %>%
-  dplyr::filter(filter == TRUE)
-
-# filter based on distance < 100 M
-dist_filtered2 <- dist %>%
-  dplyr::distinct(c_label, r_c_label, .keep_all = T) %>%
-  dplyr::mutate(filter = ifelse(distance < 100, T, F)) %>%
-  dplyr::filter(filter == T)
-  
-
-# Plot histogram of distances for each population
-ggplot(dist_filtered2) +
-  aes(x = distance,  fill = sub_pop) +
+# Plot histogram of distances for all
+ggplot(dist) +
+  aes(x = distance,  fill = under25meters) +
   #geom_point()
-  geom_histogram()
-  #facet_wrap(~isotype)
-  ylim(0,1) +
-  xlim(0,100)
-  
-# site thinning with spThin
-  test <- ass_stats_long %>%
-    dplyr::filter(env_par == "altitude") %>%
-    dplyr::mutate(sp = "C. elegans")
-    
-    
-    thinned_dataset_full <-
-    thin( loc.data = test, 
-          lat.col = "lat", long.col = "long", 
-          spec.col = "sp", 
-          thin.par = .01, reps = 100, 
-          locs.thinned.list.return = TRUE, 
-          write.files = T, 
-          max.files = 5, 
-          out.dir = "test/", out.base = "test_thinned_2_", 
-          write.log.file = TRUE,
-          log.file = "test_thinned_log_file.txt" )
+  geom_histogram(binwidth = 1000)
 
-plotThin( thinned_dataset_full )
+# extract all c_labels w/ c. elegans within 25 meters of another c_label w/ c. elegans 
+dist_filter <- dist %>%
+  dplyr::filter(under25meters == TRUE) %>%
+  dplyr::select(c_label, r_c_label) %>%
+  tidyr::gather() %>%
+  dplyr::distinct(value) %>%
+  dplyr::rename(c_label = value)
+
+#Stats with populations F and G grouped as non-admixed populations and averages for isotypes on c_labels in <25 meter clusters
+#perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
+ass_stats_cont_dist_filtered_1 <- ass_stats_cont %>%
+  dplyr::mutate(sub_pop2 = as.factor(ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed"))) %>%
+  dplyr::mutate(filter_25m = ifelse(c_label %in% dist_filter$c_label, TRUE, FALSE),
+                kalopa =filter_box(ass_stats_cont$long, ass_stats_cont$lat, c(-155.454909,20.02578,-155.430115,20.049951)),
+                volcano_1 =filter_box(ass_stats_cont$long, ass_stats_cont$lat, c(-155.2243537309,19.4221224043,-155.2216236884,19.424155)),   
+                volcano_2 =filter_box(ass_stats_cont$long, ass_stats_cont$lat, c(-155.222287312,19.424165,-155.2195572695,19.4259669944)),
+                maui = ifelse(isotype %in% c("QX1793", "QX1794"), TRUE, FALSE),
+                kauai = ifelse(isotype %in% c("XZ1514", "XZ1515", "XZ1516"), TRUE, FALSE),
+                geo_cluster = case_when(kalopa == T ~ "kalopa",
+                                        volcano_1 == T ~ "volcano_1",
+                                        volcano_2 == T ~ "volcano_2",
+                                        maui == T ~ "maui",
+                                        kauai == T ~ "kauai")) %>%
+  dplyr::group_by(env_par, sub_pop2, geo_cluster, filter_25m) %>%
+  dplyr::mutate(mean_value_25m = mean(value, na.rm = T)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(value_thinned = ifelse(filter_25m == TRUE, mean_value_25m, value))
+
+ass_stats_cont_dist_filtered <- ass_stats_cont_dist_filtered_1 %>%
+  dplyr::distinct(env_par, sub_pop2, geo_cluster, value_thinned, .keep_all = T)
+  
+Dunn_list_dist_filtered <- list()
+
+for (e in 1:length(unique(ass_stats_cont_dist_filtered$env_par))){
+  KM_df <- ass_stats_cont_dist_filtered %>%
+    dplyr::filter(env_par == (unique(ass_stats_cont_dist_filtered$env_par)[e]))
+  
+  D_test <- dunnTest(KM_df$value_thinned ~ KM_df$sub_pop2, method = "bonferroni") 
+  Dunn_list_dist_filtered[[unique(ass_stats_cont_dist_filtered$env_par)[e]]] <- D_test
+}
+
+Dunn_list_dist_filtered
+
+elevation_p <- ggplot(ass_stats_cont_dist_filtered %>% tidyr::spread(env_par, value_thinned)) +
+  aes(x = sub_pop2, y = altitude) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(aes(x = sub_pop2, y = altitude, fill = sub_pop), width = 0.25, size = 3, shape = 21) +
+  theme_bw() +
+  scale_fill_manual(values=c(ancestry.colours)) +
+  labs(y = "Elevation (m)", x = "") +
+  theme_bw() +
+  theme(legend.position="none") 
+elevation_p
+
+sub_temp_p <- ggplot(ass_stats_cont_dist_filtered %>% tidyr::spread(env_par, value)) +
+  aes(x = sub_pop2, y = substrate_temperature) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(aes(x = sub_pop2, y = substrate_temperature, fill = sub_pop), width = 0.25, size = 3, shape = 21) +
+  scale_fill_manual(values=c(ancestry.colours)) +
+  labs(y = "Substrate temperature (°C)", x = "") +
+  theme_bw() +
+  theme(legend.position="none") 
+sub_temp_p
+
+k7_box_plots <- cowplot::plot_grid(elevation_p, sub_temp_p)
+k7_box_plots
+ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_25mfiltered_GFgrouped.pdf', width = 7.5, height = 5, useDingbats = F)
+
+# # perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
+# options(scipen=999)
+# Dunn_list <- list()
+# 
+# for (e in 1:length(unique(ass_stats_cont$env_par))){
+#   KM_df <- ass_stats_cont %>%
+#     dplyr::filter(env_par == (unique(ass_stats_cont$env_par)[e]))
+#   
+#   D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop, method = "bonferroni") 
+#   Dunn_list[[unique(ass_stats_cont$env_par)[e]]] <- D_test
+# }
+# 
+# Dunn_list
+# 
+# # box plots showing with test from above
+# ggplot(ass_stats_cont %>% tidyr::spread(env_par, value)) +
+#   aes(x = sub_pop, y = altitude) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(wdith = 0.25, alpha = 0.5, shape = 21)
+# 
+# ### stats with samples restricted to one representative admix population per gridsect 
+# #perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
+# options(scipen=999)
+# Dunn_list_filtered <- list()
+# 
+# for (e in 1:length(unique(ass_stats_cont_small$env_par))){
+#   KM_df <- ass_stats_cont_small %>%
+#     dplyr::filter(env_par == (unique(ass_stats_cont_small$env_par)[e]))
+#   
+#   D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop, method = "bonferroni") 
+#   Dunn_list_filtered[[unique(ass_stats_cont_small$env_par)[e]]] <- D_test
+# }
+# 
+# Dunn_list_filtered
+# 
+# # box plots showing with test from above K=7 global
+# altitude_small <- ggplot(ass_stats_cont_small %>% tidyr::spread(env_par, value)) +
+#   aes(x = sub_pop, y = altitude) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(wdith = 0.25, alpha = 0.5) +
+#   theme_bw()
+# altitude_small
+# 
+# sub_temp_small <- ggplot(ass_stats_cont_small %>% tidyr::spread(env_par, value)) +
+#   aes(x = sub_pop, y = substrate_temperature) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(wdith = 0.25, alpha = 0.5) +
+#   theme_bw()
+# sub_temp_small
+# 
+# k7_box_plots <- cowplot::plot_grid(altitude_small, sub_temp_small)
+# k7_box_plots
+# ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_filtered.pdf', width = 7.5, height = 7.5)
+
+# ##############
+# ############## same as above but with populations F and G grouped as non-admixed populations
+# # do it again but with samples restricted to one representative admix population per gridsect 
+# #perform multiple comparisions test using Dunn's test with pvalues adjusted with Bonferroni method.
+# ass_stats_cont_small_grid <- ass_stats %>%
+#   dplyr::select(lat = latitude, long = longitude,
+#                 c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
+#                 ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
+#   dplyr::mutate(sub_pop = factor(sub_pop)) %>%
+#   dplyr::distinct(grid_num, sub_pop, .keep_all = T) %>%
+#   dplyr::filter(!is.na(grid_num))
+# 
+# ass_stats_cont_small_nogrid <- ass_stats %>%
+#   dplyr::select(lat = latitude, long = longitude,
+#                 c_label, grid_num, fixed_substrate, isotype, sub_pop = pop_assignment, altitude,
+#                 ambient_temperature, substrate_temperature, ambient_humidity, substrate_moisture) %>%
+#   dplyr::mutate(sub_pop = factor(sub_pop)) %>%
+#   dplyr::distinct(c_label, sub_pop, .keep_all = T) %>%
+#   dplyr::filter(is.na(grid_num))
+# 
+# ass_stats_cont_small <- full_join(ass_stats_cont_small_nogrid, ass_stats_cont_small_grid) %>%
+#   tidyr::gather(env_par, value, -lat, -long, -c_label, -grid_num, -fixed_substrate, -isotype, -sub_pop) %>%
+#   dplyr::group_by(sub_pop, env_par) %>%
+#   dplyr::mutate(pop_par_mean_small = mean(value, na.rm = T)) %>%
+#   dplyr::ungroup()
+# 
+# ass_stats_cont_small_grouped <- ass_stats_cont_small %>%
+#   dplyr::mutate(sub_pop2 = ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed")) %>%
+#   dplyr::ungroup() %>%
+#   # for identifying filtered data points in panel plot
+#   dplyr::mutate(id = paste(lat,long,c_label,isotype))
+
+# ass_stats_cont_small_grouped <- ass_stats_cont_small %>%
+#   dplyr::mutate(sub_pop2 = ifelse(sub_pop %in% c("F","G"), "non_admixed", "Hawaiian Admixed"))
+# 
+# options(scipen=999)
+# Dunn_list_filtered_grouped <- list()
+# 
+# for (e in 1:length(unique(ass_stats_cont_small_grouped$env_par))){
+#   KM_df <- ass_stats_cont_small_grouped %>%
+#     dplyr::filter(env_par == (unique(ass_stats_cont_small_grouped$env_par)[e]))
+#   
+#   D_test <- dunnTest(KM_df$value ~ KM_df$sub_pop2, method = "bonferroni") 
+#   Dunn_list_filtered_grouped[[unique(ass_stats_cont_small_grouped$env_par)[e]]] <- D_test
+# }
+# 
+# Dunn_list_filtered_grouped
+# 
+# # box plots showing with test from above K=7 global with grouped F and G
+# altitude_small_grouped <- ggplot(ass_stats_cont_small_grouped %>% tidyr::spread(env_par, value)) +
+#   aes(x = sub_pop2, y = altitude) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(aes(x = sub_pop2, y = altitude, fill = sub_pop), width = 0.25, size = 3, shape = 21) +
+#   theme_bw() +
+#   scale_fill_manual(values=c(ancestry.colours)) +
+#   labs(y = "Elevation (m)", x = "") +
+#   theme_bw() +
+#   theme(legend.position="none") 
+# altitude_small_grouped
+# 
+# sub_temp_small_grouped <- ggplot(ass_stats_cont_small_grouped %>% tidyr::spread(env_par, value)) +
+#   aes(x = sub_pop2, y = substrate_temperature) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(aes(x = sub_pop2, y = substrate_temperature, fill = sub_pop), width = 0.25, size = 3, shape = 21) +
+#   scale_fill_manual(values=c(ancestry.colours)) +
+#   labs(y = "Substrate temperature (°C)", x = "") +
+#   theme_bw() +
+#   theme(legend.position="none") 
+# sub_temp_small_grouped
+# 
+# k7_box_plots <- cowplot::plot_grid(altitude_small_grouped, sub_temp_small_grouped)
+# k7_box_plots
+# ggsave('plots/Hawaiian_population_association_box_plots_K=7_LD=8_filtered_GFgrouped.pdf', width = 7.5, height = 5, useDingbats = F)
