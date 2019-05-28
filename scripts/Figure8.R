@@ -644,6 +644,19 @@ for (e in 1:length(unique(ass_stats_cont_dist_filtered$env_par))){
 
 Dunn_list_dist_filtered
 
+#Same test without grouping volvano and hawaii divergent
+# Dunn_list_dist_filtered_nogroup <- list()
+# 
+# for (e in 1:length(unique(ass_stats_cont_dist_filtered$env_par))){
+#   KM_df <- ass_stats_cont_dist_filtered %>%
+#     dplyr::filter(env_par == (unique(ass_stats_cont_dist_filtered$env_par)[e]))
+#   
+#   D_test <- dunnTest(KM_df$value_thinned ~ KM_df$sub_pop, method = "bonferroni") 
+#   Dunn_list_dist_filtered_nogroup[[unique(ass_stats_cont_dist_filtered$env_par)[e]]] <- D_test
+# }
+# 
+# Dunn_list_dist_filtered_nogroup
+
 elevation_p <- ggplot(ass_stats_cont_dist_filtered %>% tidyr::spread(env_par, value_thinned)) +
   aes(x = sub_pop2, y = altitude) +
   geom_boxplot(outlier.shape = NA) +
