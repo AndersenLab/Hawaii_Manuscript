@@ -68,140 +68,68 @@ admix_sharing <- hap_admix_df  %>%
                 genome_frac_swept = genome_swept_hap_length/genome_max_length) %>%
   dplyr::ungroup()
 
-# read in climate data (Katie manuscript 2017)
-clim <- data.table::fread("~/Hawaii_Manuscript/data/strain_climate_data.csv")
-
-# combine sweep data with climate data
-sweep_clim <- full_join(admix_sharing_all, clim) %>%
-  dplyr::filter(isotype %in% clim$isotype) %>%
-  tidyr::gather(env_trait, value, ceil_hgt_min:ws_var) %>%
-  dplyr::mutate(env_trait = paste0(time_period, "_", env_trait))
-  
-# plot climate variables vs fraction sweep
-test <- ggplot(sweep_clim %>% dplyr::filter(chromosome == "V")) +
-  aes(x = value, y = max_haplotype_shared, fill = factor(pop_assignment, levels = c("A", "B", "D", "E", "C", "F", "G"))) +
-  scale_fill_manual(values=c(ancestry.colours)) +
-  geom_point(shape = 21) +
-  #geom_jitter(width = 0.25, size = 1.5, shape = ifelse(admix_sharing_all$Hawaiian == T, 21, 25)) +
-  facet_wrap(~env_trait, scales = "free") +
-  #labs(y = "Fraction most common global haplotype", x = "Ancestral population") +
-  theme_bw() +
-  theme(legend.position="none")
-
-
-
-temp_traits <- c("3yr_temp_min", "3mo_temp_min", "1yr_temp_min","3yr_temp_avg",
-                 "3mo_temp_avg","1yr_temp_avg", "3yr_temp_max", "3mo_temp_max",
-                 "1yr_temp_max", "3yr_temp_var", "3mo_temp_var", "1yr_temp_var")
-temp_sweep_clim <- sweep_clim %>%
-  dplyr::filter(env_trait %in% temp_traits) %>%
-  dplyr::distinct(isotype, env_trait, .keep_all = T)
-
-test <- ggplot(temp_sweep_clim) +
-  aes(x = pop_assignment, y = value, fill = fill = factor(pop_assignment, levels = c("A", "B", "D", "E", "C", "F", "G"))) +
-  #scale_fill_manual(values=c(ancestry.colours)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.25, size = 1.5, shape = ifelse(temp_sweep_clim$Hawaiian == T, 21, 25)) +
-  facet_wrap(~env_trait, scales = "free") +
-  scale_fill_manual(values=c(ancestry.colours)) +
-  theme_bw() +
-  theme(legend.position="none") +
-  labs(y = "temperature", x = "admixture group")
-test
-
-
-# checking correlation of fraction admixed with average sequencing depth and number of strains in isotype
-check_index <- admix %>%
-  dplyr::mutate(frac_mixed = 1-max_pop_frac)
-
-# load depth summary for isotypes in 330 set
-depth_summary <- data.table::fread("~/Hawaii_Manuscript/data/depth_summary.tsv") %>%
-  dplyr::rename(isotype = INDV)
-
-depth_summary_cendr <- data.table::fread("~/Hawaii_Manuscript/data/depth_summary_CeNDR_hard-filtered.tsv") %>%
-  dplyr::rename(isotype = INDV, MEAN_DEPTH_HF = MEAN_DEPTH, N_SITES_HF = N_SITES)
-  
-
-depth_summary <- left_join(depth_summary, depth_summary_cendr)
-
-wi_data <- data.table::fread("~/Hawaii_Manuscript/data/WI_strain_list.csv") %>%
+swept <- admix_sharing_all %>%
+  dplyr::filter(!chromosome %in% c("II", "III")) %>%
   dplyr::group_by(isotype) %>%
-  dplyr::mutate(strain_num = n()) %>%
+  dplyr::mutate(swept_chrs = sum(is_swept)) %>%
   dplyr::distinct(isotype, .keep_all = T) %>%
-  dplyr::select(isotype, strain_num)
+  dplyr::select(isotype, swept_chrs)
 
-join1 <- full_join(depth_summary, wi_data)
-join2 <- full_join(check_index, join1) %>%
-  dplyr::mutate(strain_num_group = case_when(
-                                            strain_num == 1 ~ "1",
-                                            strain_num <= 3 & strain_num > 1 ~ "2-3",
-                                            strain_num > 3 ~ "3+")) %>%
-  dplyr::mutate(admixed = ifelse(max_pop_frac < 0.95, "admix", "no_admix"))
+# read in climate data (Katie 2018) (these data are for isotype ref strains only right now)
+clim <- data.table::fread("~/Hawaii_Manuscript/data/20190606_allstrain_12mo_noaa.csv") %>%
+  dplyr::select(-V1) %>%
+  dplyr::rename(strain = isotype) %>%
+  dplyr::filter(strain %in% admix$isotype)
 
-# Plot correlations
-strain_num <- ggplot(join2) +
-  aes(x = strain_num_group, y = frac_mixed) +
+#look at distribution of distance of station to sample and elevation difference
+ggplot(clim %>% dplyr::distinct(strain, .keep_all = T)) +
+  aes(x = station_distance) +
+  geom_vline(xintercept = 100, color = "red") +
+  geom_histogram(binwidth = 50) +
+  labs(x = "Station Distance (m)")
+
+# get wild isolate info for all 276 isotypes.
+isotype_data <- data.table::fread("~/Hawaii_Manuscript/data/WI_strain_list.csv") %>%
+  dplyr::filter(isotype %in% c(as.character(admix$isotype))) %>%
+  dplyr::select(isotype, strain, latitude, longitude, isolation_date)
+  
+# combine admix data with climate data (filter out strains with station distance greter than 100km)
+pop_clim <- full_join(admix, clim  %>% dplyr::rename(isotype = strain)) %>% # %>% dplyr::filter(station_distance <= 100)
+  tidyr::spread(trait, value) %>% 
+  #add in swept chr count
+  full_join(., swept)
+  
+
+# plot sd for populations 
+ggplot(pop_clim) +
+  aes(x = factor(pop_assignment, levels = c("A", "B", "D", "E", "C", "F", "G")), y = as.double(sd.temp), fill = pop_assignment) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.25, size = 1.5, shape = 21) +
-  
-  #labs(y = "Fraction most common global haplotype", x = "Ancestral population") +
-  theme_bw() +
-  theme(legend.position="none") +
-  labs(y="Fraction admixed", x="number of strains in isotype") 
-strain_num
+  geom_jitter(width = .25, shape = ifelse(pop_clim$Hawaiian == TRUE, 21, 24)) +
+  scale_fill_manual(values = ancestry.colours) +
+  labs(y = "12-month temperature SD (°C)", x = "Ancestral population") +
+  theme_bw()
 
-# Run non-parametric kruskal-wallis test with Dunn's post-hoc test. Kruskal–Wallis test does not assume a normal distribution of the residuals
-dtest <- dunnTest(join2$frac_mixed ~ join2$strain_num_group, method = "bonferroni")
+# save climate data plot
+ggsave('plots/clim_admix_SD_temp.pdf', width = 12, height = 7.5)
 
-# Run enrichment test on admixed strains
-# shape data for analysis at Caenorhabditis level
-enrich_test <- join2 %>%
-  dplyr::filter(!is.na(admixed)) %>%
-  dplyr::group_by(strain_num_group, admixed) %>%
-  dplyr::mutate(admix_count = n()) %>%
-  dplyr::distinct(strain_num_group, admix_count, admixed) %>%
-  dplyr::ungroup() %>%
-  tidyr::spread(admixed, admix_count) %>%
-  column_to_rownames(var = "strain_num_group") %>%
-  as.matrix(.)
+ggplot(pop_clim) +
+  aes(x = as.character(swept_chrs), y = as.double(sd.temp)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(aes(fill = pop_assignment), width = .25, shape = ifelse(pop_clim$Hawaiian == TRUE, 21, 24)) +
+  scale_fill_manual(values = ancestry.colours) +
+  labs(y = "12-month temperature SD (°C)", x = "Number of swept chromosomes") +
+  theme_bw()
 
-# show p-values without scientific notation
-options(scipen=999)
+# save climate data plot
+ggsave('plots/clim_num_chr_swept_SD_temp.pdf', width = 12, height = 7.5)
 
-# full chi squared test to see if there are differernces 
-chisq.test(enrich_test, simulate.p.value = TRUE)
 
-# Post-hoc pairwise Fisher tests with pairwise.table
-pairwiseNominalIndependence(enrich_test,
-                            fisher = TRUE,
-                            gtest  = FALSE,
-                            chisq  = FALSE,
-                            method = "bonferroni", simulate.p.value = TRUE)
 
-# plot with coverage depth
-cov_depth <- ggplot(join2) +
-  aes(x = MEAN_DEPTH, y = frac_mixed) +
-  #geom_boxplot(outlier.shape = NA) +
-  geom_point(width = 0.25, size = 1.5, shape = 21) +
-  
-  #labs(y = "Fraction most common global haplotype", x = "Ancestral population") +
-  theme_bw() +
-  theme(legend.position="none") +
-  labs(y="Fraction admixed", x="mean depth")  +
-  geom_smooth()
-cov_depth
-
-cov_strain <- ggplot(join2) +
-  aes(x = strain_num, y = MEAN_DEPTH) +
-  #geom_boxplot(outlier.shape = NA) +
-  geom_point(width = 0.25, size = 1.5, shape = 21) +
-  
-  #labs(y = "Fraction most common global haplotype", x = "Ancestral population") +
-  theme_bw() +
-  theme(legend.position="none") +
-  labs(y="Mean depth", x="number of strains in isotype") +
-  geom_smooth()
-cov_strain
-
+# # look at climate parameters for admix populations. 
+# ggplot(pop_clim) +
+#   aes(x = pop_assignment, y = value) +
+#   geom_boxplot(outlier.shape = NA) +
+#   geom_jitter(width = .25, shape = ifelse(pop_clim$Hawaiian == TRUE, 21, 24)) +
+#   facet_wrap(~trait, scales = "free")
 
 
